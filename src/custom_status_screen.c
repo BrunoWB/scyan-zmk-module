@@ -4,6 +4,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <string.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -369,7 +370,15 @@ static void render_screen(const struct custom_status_state *state) {
     lv_obj_invalidate(canvas_obj);
 }
 
+static struct custom_status_state last_rendered_state;
+static bool state_has_rendered = false;
+
 static void custom_status_update_cb(struct custom_status_state state) {
+    if (state_has_rendered && memcmp(&last_rendered_state, &state, sizeof(state)) == 0) {
+        return;
+    }
+    last_rendered_state = state;
+    state_has_rendered = true;
     render_screen(&state);
 }
 
@@ -377,7 +386,8 @@ static void custom_status_update_cb(struct custom_status_state state) {
 static struct k_work_delayable idle_work;
 
 static struct custom_status_state custom_status_get_state(const zmk_event_t *eh) {
-    struct custom_status_state s = {0};
+    struct custom_status_state s;
+    memset(&s, 0, sizeof(s));
 
     // Battery status
     s.battery_level = zmk_battery_state_of_charge();
@@ -426,18 +436,16 @@ static struct custom_status_state custom_status_get_state(const zmk_event_t *eh)
 #endif
 #endif
 
-    // Activity check: key press/release or layer change resets idle timeout
-    if (eh != NULL && (as_zmk_position_state_changed(eh) != NULL
+    // Activity check: layer change resets idle timeout
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-        || as_zmk_layer_state_changed(eh) != NULL
-#endif
-    )) {
+    if (eh != NULL && as_zmk_layer_state_changed(eh) != NULL) {
         last_activity_time = k_uptime_get();
         if (is_screen_idle) {
             is_screen_idle = false;
         }
         k_work_reschedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
     }
+#endif
 
     s.is_idle = is_screen_idle;
     return s;
@@ -463,7 +471,24 @@ ZMK_SUBSCRIPTION(widget_custom_status, zmk_wpm_state_changed);
 ZMK_SUBSCRIPTION(widget_custom_status, zmk_split_peripheral_status_changed);
 #endif
 #endif
-ZMK_SUBSCRIPTION(widget_custom_status, zmk_position_state_changed);
+
+/* Dedicated lightweight listener for idle wakeup; avoids triggering full display redraws during typing */
+static int custom_idle_listener_cb(const zmk_event_t *eh) {
+    if (as_zmk_position_state_changed(eh) != NULL) {
+        last_activity_time = k_uptime_get();
+        if (is_screen_idle) {
+            is_screen_idle = false;
+            if (zmk_display_is_initialized()) {
+                widget_custom_status_refresh_state(NULL);
+                k_work_submit_to_queue(zmk_display_work_q(), &widget_custom_status_work);
+            }
+        }
+        k_work_reschedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+ZMK_LISTENER(custom_idle_listener, custom_idle_listener_cb);
+ZMK_SUBSCRIPTION(custom_idle_listener, zmk_position_state_changed);
 
 static void refresh_work_cb(struct k_work *work) {
     if (zmk_display_is_initialized()) {
