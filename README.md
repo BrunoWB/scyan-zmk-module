@@ -1,6 +1,6 @@
-# brunowb-zmk-display
+# zmk-display-core
 
-A modular custom status screen for vertical OLED displays (128x32 SSD1306) on ZMK keyboards (such as the Corne / CRKBD).
+A modular custom status screen library for vertical OLED displays (128x32 SSD1306) on ZMK keyboards (such as the Corne / CRKBD).
 
 Features custom 1-bit pixel art, an event-driven architecture, battery gauge, WPM speed meter, split peripheral link monitor, and an automatic idle screen with customizable branding.
 
@@ -31,13 +31,13 @@ manifest:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
     - name: brunowb
-      url-base: https://github.com/brunowb
+      url-base: https://github.com/BrunoWB
   projects:
     - name: zmk
       remote: zmkfirmware
       revision: v0.3
       import: app/west.yml
-    - name: brunowb-zmk-display
+    - name: zmk-display-core
       remote: brunowb
       revision: main
   self:
@@ -87,4 +87,4 @@ CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME="CORNE"
 ## Online Editor & Customization
 
 Design your own pixel art and preview layouts in your browser with the companion editor:
-**[brunowb.github.io/zmk-display-editor/](https://brunowb.github.io/zmk-display-editor/)**
+**[brunowb.github.io/zmk-display-builder/](https://brunowb.github.io/zmk-display-builder/)**
