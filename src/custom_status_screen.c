@@ -102,31 +102,181 @@ static void v_fill_rect(int x, int y, int w, int h, uint8_t val) {
     }
 }
 
-static void v_draw_bitmap(int x, int y, int w, int h, const uint8_t *bmp, int stride) {
+static void v_draw_atlas_subrect(int dst_x, int dst_y,
+                                 const uint8_t *atlas, int atlas_stride,
+                                 int src_x, int src_y, int w, int h) {
     for (int r = 0; r < h; r++) {
+        int vy = dst_y + r;
+        if (vy < 0 || vy >= DISPLAY_VIRTUAL_HEIGHT) continue;
+        int sy = src_y + r;
         for (int c = 0; c < w; c++) {
-            int byte_idx = r * stride + (c / 8);
-            int bit_idx = 7 - (c % 8);
-            if ((bmp[byte_idx] >> bit_idx) & 1) {
-                v_set_pixel(x + c, y + r, 1);
+            int vx = dst_x + c;
+            if (vx < 0 || vx >= DISPLAY_VIRTUAL_WIDTH) continue;
+            int sx = src_x + c;
+            int byte_idx = sy * atlas_stride + (sx / 8);
+            int bit_idx = 7 - (sx % 8);
+            if ((atlas[byte_idx] >> bit_idx) & 1) {
+                vbuf[vy][vx] = 1;
             }
         }
     }
 }
 
-static void draw_battery_at(int x, int y, uint8_t level) {
-    // Battery outer frame:
-    // Top & bottom lines: x..x+15, y and y+9 (width 16)
-    v_fill_rect(x, y, 16, 1, 1);
-    v_fill_rect(x, y + 9, 16, 1, 1);
-    // Left border: x, y+1..y+8
-    v_fill_rect(x, y + 1, 1, 8, 1);
-    // Right border: x+15, ONLY at y+1 and y+8 (y+2..y+7 is open to nipple)
-    v_set_pixel(x + 15, y + 1, 1);
-    v_set_pixel(x + 15, y + 8, 1);
+static void v_draw_symbol(int dst_x, int dst_y, enum symbol_id id) {
+    if (id >= SYMBOL_COUNT) return;
+    const struct sprite_slice *slice = &SYMBOL_SLICES[id];
+    v_draw_atlas_subrect(dst_x, dst_y,
+                         SYMBOLS_ATLAS, SYMBOLS_ATLAS_STRIDE,
+                         slice->x, slice->y, slice->width, slice->height);
+}
 
-    // Battery terminal/nipple: x+16, y+2..y+7 (height 6)
-    v_fill_rect(x + 16, y + 2, 1, 6, 1);
+static inline void v_draw_bitmap(int x, int y, int w, int h, const uint8_t *bmp, int stride) {
+    v_draw_atlas_subrect(x, y, bmp, stride, 0, 0, w, h);
+}
+
+static uint16_t utf8_next_codepoint(const char **str) {
+    if (!str || !*str || !**str) return 0;
+    const uint8_t *s = (const uint8_t *)*str;
+    uint16_t cp = 0;
+    if (s[0] < 0x80) {
+        cp = s[0];
+        *str += 1;
+    } else if ((s[0] & 0xE0) == 0xC0) {
+        if ((s[1] & 0xC0) == 0x80) {
+            cp = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+            *str += 2;
+        } else {
+            *str += 1;
+        }
+    } else if ((s[0] & 0xF0) == 0xE0) {
+        if ((s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80) {
+            cp = ((s[0] & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+            *str += 3;
+        } else {
+            *str += 1;
+        }
+    } else {
+        *str += 1;
+    }
+    return cp;
+}
+
+static const struct font_glyph *v_font_find_glyph(const struct display_font *font, uint16_t codepoint) {
+    if (!font || !font->glyphs) return NULL;
+
+    for (uint16_t i = 0; i < font->glyph_count; i++) {
+        if (font->glyphs[i].codepoint == codepoint) {
+            return &font->glyphs[i];
+        }
+    }
+
+    // Lowercase to uppercase fold
+    if (codepoint >= 'a' && codepoint <= 'z') {
+        uint16_t upper = codepoint - 'a' + 'A';
+        for (uint16_t i = 0; i < font->glyph_count; i++) {
+            if (font->glyphs[i].codepoint == upper) {
+                return &font->glyphs[i];
+            }
+        }
+    }
+
+    // Unicode accent fallback to base ASCII
+    uint16_t base = 0;
+    switch (codepoint) {
+        case 0x00C0: case 0x00C1: case 0x00C2: case 0x00C3: case 0x00C4: case 0x00C5:
+        case 0x00E0: case 0x00E1: case 0x00E2: case 0x00E3: case 0x00E4: case 0x00E5:
+            base = 'A'; break;
+        case 0x00C7: case 0x00E7:
+            base = 'C'; break;
+        case 0x00C8: case 0x00C9: case 0x00CA: case 0x00CB:
+        case 0x00E8: case 0x00E9: case 0x00EA: case 0x00EB:
+            base = 'E'; break;
+        case 0x00CC: case 0x00CD: case 0x00CE: case 0x00CF:
+        case 0x00EC: case 0x00ED: case 0x00EE: case 0x00EF:
+            base = 'I'; break;
+        case 0x00D1: case 0x00F1:
+            base = 'N'; break;
+        case 0x00D2: case 0x00D3: case 0x00D4: case 0x00D5: case 0x00D6:
+        case 0x00F2: case 0x00F3: case 0x00F4: case 0x00F5: case 0x00F6:
+            base = 'O'; break;
+        case 0x00D9: case 0x00DA: case 0x00DB: case 0x00DC:
+        case 0x00F9: case 0x00FA: case 0x00FB: case 0x00FC:
+            base = 'U'; break;
+        default: break;
+    }
+    if (base != 0) {
+        for (uint16_t i = 0; i < font->glyph_count; i++) {
+            if (font->glyphs[i].codepoint == base) {
+                return &font->glyphs[i];
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static int v_draw_char(int x, int y, const struct display_font *font, uint16_t codepoint) {
+    const struct font_glyph *g = v_font_find_glyph(font, codepoint);
+    if (!g) return 0;
+    v_draw_atlas_subrect(x, y, font->atlas, font->atlas_stride,
+                         g->x, g->y, g->width, g->height);
+    return g->advance_x;
+}
+
+static int v_measure_text(const struct display_font *font, const char *text) {
+    if (!font || !text) return 0;
+    int total_w = 0;
+    int last_trailing = 0;
+    const char *ptr = text;
+    while (*ptr) {
+        uint16_t cp = utf8_next_codepoint(&ptr);
+        if (cp == 0) break;
+        if (cp == ' ') {
+            total_w += font->space_advance ? font->space_advance : 3;
+            last_trailing = 0;
+            continue;
+        }
+        const struct font_glyph *g = v_font_find_glyph(font, cp);
+        if (g) {
+            total_w += g->advance_x;
+            last_trailing = (g->advance_x > g->width) ? (g->advance_x - g->width) : 0;
+        } else {
+            total_w += 3;
+            last_trailing = 0;
+        }
+    }
+    if (total_w > 0 && last_trailing > 0) {
+        total_w -= last_trailing;
+    }
+    return total_w;
+}
+
+static int v_draw_text(int x, int y, const struct display_font *font, const char *text) {
+    if (!font || !text) return 0;
+    int cur_x = x;
+    const char *ptr = text;
+    while (*ptr) {
+        uint16_t cp = utf8_next_codepoint(&ptr);
+        if (cp == 0) break;
+        if (cp == ' ') {
+            cur_x += font->space_advance ? font->space_advance : 3;
+            continue;
+        }
+        const struct font_glyph *g = v_font_find_glyph(font, cp);
+        if (g) {
+            v_draw_atlas_subrect(cur_x, y, font->atlas, font->atlas_stride,
+                                 g->x, g->y, g->width, g->height);
+            cur_x += g->advance_x;
+        } else {
+            cur_x += 3;
+        }
+    }
+    return cur_x - x;
+}
+
+static void draw_battery_at(int x, int y, uint8_t level) {
+    // Battery outer frame from symbol atlas (17x10)
+    v_draw_symbol(x, y, SYMBOL_BATTERY_FRAME);
 
     // Interior fill: rows y+2..y+7 (6 rows), columns start at x+2
     if (level >= 100) {
@@ -162,13 +312,12 @@ static inline void draw_battery(uint8_t level) {
 
 static void draw_wpm_and_arrows(uint8_t wpm) {
     if (wpm > 0) {
-        // Draw 3 digits at y=83: hundreds at x=2, tens at x=12, ones at x=22
-        int d_hundreds = (wpm / 100) % 10;
-        int d_tens = (wpm / 10) % 10;
-        int d_ones = wpm % 10;
-        v_draw_bitmap(2, 83, 8, 10, FONT_DIGITS[d_hundreds], 1);
-        v_draw_bitmap(12, 83, 8, 10, FONT_DIGITS[d_tens], 1);
-        v_draw_bitmap(22, 83, 8, 10, FONT_DIGITS[d_ones], 1);
+        char buf[4];
+        buf[0] = '0' + ((wpm / 100) % 10);
+        buf[1] = '0' + ((wpm / 10) % 10);
+        buf[2] = '0' + (wpm % 10);
+        buf[3] = '\0';
+        v_draw_text(2, 83, &font_digits, buf);
     }
 
     // Arrow indicator bar: 7 slots at y=95..99 (center row y=97)
@@ -183,96 +332,44 @@ static void draw_wpm_and_arrows(uint8_t wpm) {
 
     for (int slot = 0; slot < 7; slot++) {
         int sx = 3 + slot * 4;
-        if (slot < num_arrows) {
-            // Draw 5x3 arrowhead pointing right at y=95..99
-            v_set_pixel(sx, 95, 1);
-            v_set_pixel(sx, 96, 1);
-            v_set_pixel(sx + 1, 96, 1);
-            v_set_pixel(sx, 97, 1);
-            v_set_pixel(sx + 1, 97, 1);
-            v_set_pixel(sx + 2, 97, 1);
-            v_set_pixel(sx, 98, 1);
-            v_set_pixel(sx + 1, 98, 1);
-            v_set_pixel(sx, 99, 1);
-        } else {
-            // Dot at center tip (sx + 2, y=97)
-            v_set_pixel(sx + 2, 97, 1);
-        }
-    }
-}
-
-static void draw_idle_screen(const struct custom_status_state *state) {
-    // 1. Skull looking straight forward (layer 0) at y=47..69, x=3..28 (26x23)
-    v_draw_bitmap(3, 47, 26, 23, SKULL_LAYERS[0], 4);
-
-    // 2. Custom pixel text at y=73..77
-    const char *user_name = CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME;
-    int len = strlen(user_name);
-    if (len > 0) {
-        int total_w = 0;
-        for (int i = 0; i < len; i++) {
-            char c = user_name[i];
-            if (c >= 'A' && c <= 'Z') {
-                total_w += FONT_LETTERS[c - 'A'].width + 1;
-            } else if (c >= 'a' && c <= 'z') {
-                total_w += FONT_LETTERS[c - 'a'].width + 1;
-            } else {
-                total_w += 3;
-            }
-        }
-        if (total_w > 0) total_w -= 1;
-        int start_x = (DISPLAY_VIRTUAL_WIDTH - total_w + 1) / 2;
-        if (start_x < 0) start_x = 0;
-        int cur_x = start_x;
-        for (int i = 0; i < len; i++) {
-            char c = user_name[i];
-            if (c >= 'A' && c <= 'Z') {
-                int idx = c - 'A';
-                v_draw_bitmap(cur_x, 73, FONT_LETTERS[idx].width, 5, FONT_LETTERS[idx].data, 1);
-                cur_x += FONT_LETTERS[idx].width + 1;
-            } else if (c >= 'a' && c <= 'z') {
-                int idx = c - 'a';
-                v_draw_bitmap(cur_x, 73, FONT_LETTERS[idx].width, 5, FONT_LETTERS[idx].data, 1);
-                cur_x += FONT_LETTERS[idx].width + 1;
-            } else {
-                cur_x += 3;
-            }
-        }
-    }
-
-    // 3. Split connection icon at y=116..124, x=10..22 (13x9)
-    if (state->split_connected) {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_CONNECTED, 2);
-    } else {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_DISCONNECTED, 2);
+        v_draw_symbol(sx, 95, slot < num_arrows ? SYMBOL_ARROW_HEAD : SYMBOL_ARROW_DOT);
     }
 }
 
 static void draw_qwerty_label(void) {
     // "QWERTY" pixel text at y=28..32 spanning x=0..31
-    v_draw_bitmap(0, 28, FONT_LETTERS['Q' - 'A'].width, 5, FONT_LETTERS['Q' - 'A'].data, 1);
-    v_draw_bitmap(5, 28, FONT_LETTERS['W' - 'A'].width, 5, FONT_LETTERS['W' - 'A'].data, 1);
-    v_draw_bitmap(11, 28, FONT_LETTERS['E' - 'A'].width, 5, FONT_LETTERS['E' - 'A'].data, 1);
-    v_draw_bitmap(16, 28, FONT_LETTERS['R' - 'A'].width, 5, FONT_LETTERS['R' - 'A'].data, 1);
-    v_draw_bitmap(21, 28, FONT_LETTERS['T' - 'A'].width, 5, FONT_LETTERS['T' - 'A'].data, 1);
-    v_draw_bitmap(27, 28, FONT_LETTERS['Y' - 'A'].width, 5, FONT_LETTERS['Y' - 'A'].data, 1);
+    v_draw_text(0, 28, &font_text, "QWERTY");
+}
+
+static void draw_idle_screen(const struct custom_status_state *state) {
+    // 1. Skull looking straight forward (layer 0) at y=47..69, x=3..28 (26x23)
+    v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER_0);
+
+    // 2. Custom pixel text at y=73..77
+    const char *user_name = CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME;
+    int total_w = v_measure_text(&font_text, user_name);
+    int start_x = (DISPLAY_VIRTUAL_WIDTH - total_w + 1) / 2;
+    if (start_x < 0) start_x = 0;
+    v_draw_text(start_x, 73, &font_text, user_name);
+
+    // 3. Split connection icon at y=116..124, x=10..22 (13x9)
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
 }
 
 static void draw_active_screen(const struct custom_status_state *state) {
     // 1. Connection icon (USB vs Bluetooth)
     if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
         // USB cable and connector icon at x=0, y=0 (12x10)
-        v_draw_bitmap(0, 0, 12, 10, ICON_USB, 2);
+        v_draw_symbol(0, 0, SYMBOL_USB);
     } else {
         // Bluetooth icon at x=2, y=3 (8x8)
-        v_draw_bitmap(2, 3, 8, 8, ICON_BLUETOOTH, 1);
+        v_draw_symbol(2, 3, SYMBOL_BLUETOOTH);
 
         // Profile Letter: only if connected
         if (state->active_profile_connected) {
             int prof = state->active_profile_index;
             if (prof >= 0 && prof < 26) {
-                const struct glyph_letter *gl = &FONT_LETTERS[prof];
-                v_draw_bitmap(8, 9, gl->width, 5, gl->data, 1);
+                v_draw_char(8, 9, &font_text, 'A' + prof);
             }
         }
     }
@@ -284,35 +381,27 @@ static void draw_active_screen(const struct custom_status_state *state) {
     uint8_t layer = state->active_layer;
     if (layer == 1) {
         draw_qwerty_label();
-        v_draw_bitmap(3, 47, 26, 23, SKULL_LAYERS[0], 4);
+        v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER_0);
     } else {
         uint8_t idx = 0;
         if (layer >= 2 && layer <= 4) {
             idx = layer - 1; // 2->1 (RightHold), 3->2 (LeftHold), 4->3 (SimmHold)
         }
-        v_draw_bitmap(5, 25, 22, 11, BRACKET_LAYERS[idx], 3);
-        v_draw_bitmap(3, 47, 26, 23, SKULL_LAYERS[idx], 4);
+        v_draw_symbol(5, 25, SYMBOL_BRACKET_LAYER(idx));
+        v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER(idx));
     }
 
     // 5. WPM digits and arrow progress bar at y=83..99
     draw_wpm_and_arrows(state->wpm);
 
     // 6. Split connection icon at y=116..124, x=10..22 (13x9)
-    if (state->split_connected) {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_CONNECTED, 2);
-    } else {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_DISCONNECTED, 2);
-    }
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
 }
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 static void draw_peripheral_idle_screen(const struct custom_status_state *state) {
     // Idle screen: keep only the connection symbol at bottom (x=10, y=116, 13x9)
-    if (state->split_connected) {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_CONNECTED, 2);
-    } else {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_DISCONNECTED, 2);
-    }
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
 }
 
 static void draw_peripheral_screen(const struct custom_status_state *state) {
@@ -320,11 +409,7 @@ static void draw_peripheral_screen(const struct custom_status_state *state) {
     draw_battery_at(7, 3, state->battery_level);
 
     // 2. Module connection symbol at bottom (x=10, y=116, 13x9)
-    if (state->split_connected) {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_CONNECTED, 2);
-    } else {
-        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_DISCONNECTED, 2);
-    }
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
 }
 #endif
 
