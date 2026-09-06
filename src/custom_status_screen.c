@@ -147,6 +147,7 @@ static uint16_t utf8_next_codepoint(const char **str) {
             *str += 2;
         } else {
             *str += 1;
+            return 0xFFFD;
         }
     } else if ((s[0] & 0xF0) == 0xE0) {
         if ((s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80) {
@@ -154,9 +155,19 @@ static uint16_t utf8_next_codepoint(const char **str) {
             *str += 3;
         } else {
             *str += 1;
+            return 0xFFFD;
+        }
+    } else if ((s[0] & 0xF8) == 0xF0) {
+        if ((s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80 && (s[3] & 0xC0) == 0x80) {
+            *str += 4;
+            return 0xFFFD;
+        } else {
+            *str += 1;
+            return 0xFFFD;
         }
     } else {
         *str += 1;
+        return 0xFFFD;
     }
     return cp;
 }
@@ -170,9 +181,19 @@ static const struct font_glyph *v_font_find_glyph(const struct display_font *fon
         }
     }
 
-    // Lowercase to uppercase fold
+    // Lowercase to uppercase fold (ASCII)
     if (codepoint >= 'a' && codepoint <= 'z') {
         uint16_t upper = codepoint - 'a' + 'A';
+        for (uint16_t i = 0; i < font->glyph_count; i++) {
+            if (font->glyphs[i].codepoint == upper) {
+                return &font->glyphs[i];
+            }
+        }
+    }
+
+    // Lowercase to uppercase fold (Latin-1 Supplement: à..þ except ÷)
+    if (codepoint >= 0x00E0 && codepoint <= 0x00FE && codepoint != 0x00F7) {
+        uint16_t upper = codepoint - 0x0020;
         for (uint16_t i = 0; i < font->glyph_count; i++) {
             if (font->glyphs[i].codepoint == upper) {
                 return &font->glyphs[i];
