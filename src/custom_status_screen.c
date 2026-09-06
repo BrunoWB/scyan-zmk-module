@@ -305,6 +305,15 @@ static void draw_active_screen(const struct custom_status_state *state) {
 }
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static void draw_peripheral_idle_screen(const struct custom_status_state *state) {
+    // Idle screen: keep only the connection symbol at bottom (x=10, y=116, 13x9)
+    if (state->split_connected) {
+        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_CONNECTED, 2);
+    } else {
+        v_draw_bitmap(10, 116, 13, 9, ICON_SPLIT_DISCONNECTED, 2);
+    }
+}
+
 static void draw_peripheral_screen(const struct custom_status_state *state) {
     // 1. Centered battery icon at top (x=7, y=3) without USB or Bluetooth icon
     draw_battery_at(7, 3, state->battery_level);
@@ -324,7 +333,11 @@ static void render_screen(const struct custom_status_state *state) {
     v_clear();
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    draw_peripheral_screen(state);
+    if (state->is_idle) {
+        draw_peripheral_idle_screen(state);
+    } else {
+        draw_peripheral_screen(state);
+    }
 #else
     if (state->is_idle) {
         draw_idle_screen(state);
