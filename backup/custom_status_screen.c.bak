@@ -1,6 +1,6 @@
 /*
- * Custom status screen implementation for ZMK display.
- * Purely data-driven rendering of layout blocks exported by zmk-display-builder.
+ * Custom status screen implementation for Corne vertical OLED display
+ * matching custom pixel art design.
  */
 
 #include <zephyr/kernel.h>
@@ -72,7 +72,6 @@ struct custom_status_state {
     bool active_profile_connected;
     bool active_profile_bonded;
     uint8_t active_layer;
-    char layer_name[16];
     uint8_t wpm;
     bool split_connected;
     bool is_idle;
@@ -98,13 +97,8 @@ static inline void v_set_pixel(int x, int y, uint8_t val) {
 
 static void v_fill_rect(int x, int y, int w, int h, uint8_t val) {
     for (int r = 0; r < h; r++) {
-        int vy = y + r;
-        if (vy < 0 || vy >= DISPLAY_VIRTUAL_HEIGHT) continue;
         for (int c = 0; c < w; c++) {
-            int vx = x + c;
-            if (vx >= 0 && vx < DISPLAY_VIRTUAL_WIDTH) {
-                vbuf[vy][vx] = val;
-            }
+            v_set_pixel(x + c, y + r, val);
         }
     }
 }
@@ -129,12 +123,16 @@ static void v_draw_atlas_subrect(int dst_x, int dst_y,
     }
 }
 
-static void v_draw_symbol(int dst_x, int dst_y, uint16_t id) {
+static void v_draw_symbol(int dst_x, int dst_y, enum symbol_id id) {
     if (id >= SYMBOL_COUNT) return;
     const struct sprite_slice *slice = &SYMBOL_SLICES[id];
     v_draw_atlas_subrect(dst_x, dst_y,
                          SYMBOLS_ATLAS, SYMBOLS_ATLAS_STRIDE,
                          slice->x, slice->y, slice->width, slice->height);
+}
+
+static inline void v_draw_bitmap(int x, int y, int w, int h, const uint8_t *bmp, int stride) {
+    v_draw_atlas_subrect(x, y, bmp, stride, 0, 0, w, h);
 }
 
 static uint16_t utf8_next_codepoint(const char **str) {
@@ -162,8 +160,8 @@ static uint16_t utf8_next_codepoint(const char **str) {
         }
     } else if ((s[0] & 0xF8) == 0xF0) {
         if ((s[1] & 0xC0) == 0x80 && (s[2] & 0xC0) == 0x80 && (s[3] & 0xC0) == 0x80) {
-            cp = ((s[0] & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
             *str += 4;
+            return 0xFFFD;
         } else {
             *str += 1;
             return 0xFFFD;
@@ -298,18 +296,74 @@ static int v_draw_text(int x, int y, const struct display_font *font, const char
     return cur_x - x;
 }
 
-static inline const struct display_font *v_get_text_font(void) {
-    if (font_small.glyph_count > 0) return &font_small;
-    if (font_text.glyph_count > 0) return &font_text;
-    return &font_default;
+static void draw_battery_at(int x, int y, uint8_t level) {
+    // Battery outer frame from symbol atlas (17x10)
+    v_draw_symbol(x, y, SYMBOL_BATTERY_FRAME);
+
+    // Interior fill: rows y+2..y+7 (6 rows), columns start at x+2
+    if (level >= 100) {
+        // Special case 100%:
+        // Top and bottom interior rows (y+2, y+7) have 12 pixels (x+2..x+13)
+        // Middle rows (y+3..y+6) have 13 pixels (x+2..x+14) extending toward the nipple
+        v_fill_rect(x + 2, y + 2, 12, 1, 1);
+        v_fill_rect(x + 2, y + 3, 13, 4, 1);
+        v_fill_rect(x + 2, y + 7, 12, 1, 1);
+    } else if (level > 0) {
+        // 0..99% is progressive across 72 total slots (12 cols x 6 rows, x+2..x+13)
+        // Subtraction order: from top (row 0: y+2) down to bottom (row 5: y+7)
+        int total_fill = (level * 72) / 99;
+        if (total_fill > 72) total_fill = 72;
+        if (total_fill < 1 && level > 0) total_fill = 1;
+
+        int base_cols = total_fill / 6;
+        int remainder = total_fill % 6;
+
+        for (int r = 0; r < 6; r++) {
+            int row_cols = base_cols + ((5 - r) < remainder ? 1 : 0);
+            if (row_cols > 12) row_cols = 12;
+            if (row_cols > 0) {
+                v_fill_rect(x + 2, y + 2 + r, row_cols, 1, 1);
+            }
+        }
+    }
 }
 
-static inline const struct display_font *v_get_digits_font(void) {
-    if (font_digits.glyph_count > 0) return &font_digits;
-    if (font_big.glyph_count > 0) return &font_big;
-    return &font_default;
+static inline void draw_battery(uint8_t level) {
+    draw_battery_at(13, 3, level);
 }
 
+static void draw_wpm_and_arrows(uint8_t wpm) {
+    if (wpm > 0) {
+        char buf[4];
+        buf[0] = '0' + ((wpm / 100) % 10);
+        buf[1] = '0' + ((wpm / 10) % 10);
+        buf[2] = '0' + (wpm % 10);
+        buf[3] = '\0';
+        v_draw_text(2, 83, &font_digits, buf);
+    }
+
+    // Arrow indicator bar: 7 slots at y=95..99 (center row y=97)
+    // 0 WPM: no arrows, only 7 dots
+    // 100 WPM: all 7 arrows full
+    int num_arrows = 0;
+    if (wpm > 0) {
+        num_arrows = (wpm >= 100) ? 7 : (wpm * 7 + 50) / 100;
+        if (num_arrows < 1) num_arrows = 1;
+        if (num_arrows > 7) num_arrows = 7;
+    }
+
+    for (int slot = 0; slot < 7; slot++) {
+        int sx = 3 + slot * 4;
+        v_draw_symbol(sx, 95, slot < num_arrows ? SYMBOL_ARROW_HEAD : SYMBOL_ARROW_DOT);
+    }
+}
+
+static void draw_qwerty_label(void) {
+    // "QWERTY" pixel text at y=28..32 spanning x=0..31
+    v_draw_text(0, 28, &font_text, "QWERTY");
+}
+
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
 #define WPM_HISTORY_MAX 32
 static uint8_t wpm_history[WPM_HISTORY_MAX];
 static uint8_t wpm_history_idx = 0;
@@ -323,11 +377,11 @@ static void update_wpm_history(uint8_t wpm) {
     }
 }
 
-static void draw_wpm_chart(int x, int y, int w, int h, int grid_size, int target_speed) {
+static void draw_wpm_chart(int x, int y, int w, int h, uint8_t current_wpm, int grid_size, int target_speed) {
     if (w <= 0 || h <= 0) return;
     if (target_speed <= 0) target_speed = 100;
 
-    // Grid baseline
+    // Baseline dots
     for (int col = 0; col < w; col += 2) {
         v_set_pixel(x + col, y + h - 1, 1);
     }
@@ -352,94 +406,28 @@ static void draw_wpm_chart(int x, int y, int w, int h, int grid_size, int target
     }
 }
 
-static void draw_battery_widget(const struct display_layout_block *b, uint8_t level, bool charging) {
-    if (b->mode == 1) {
-        // Font mode
-        if (b->text_count >= 2) {
-            int idx = ((int)level * (b->text_count - 1) + 50) / 100;
-            if (idx >= b->text_count) idx = b->text_count - 1;
-            v_draw_text(b->x, b->y, v_get_text_font(), b->text_entries[idx]);
-        } else {
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%d%%", level);
-            v_draw_text(b->x, b->y, v_get_text_font(), buf);
-        }
-        return;
-    }
-
-    // Symbol mode
-    if (b->symbol_count >= 2) {
-        // Progressive discrete battery symbols (e.g. 0%, 25%, 50%, 75%, 100%)
-        int idx = ((int)level * (b->symbol_count - 1) + 50) / 100;
-        if (idx >= b->symbol_count) idx = b->symbol_count - 1;
-        v_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
-    } else {
-        // Single battery frame with proportional fill
-        uint16_t frame_sym = (b->symbol_count > 0) ? b->symbol_ids[0] : b->symbol_id;
-        v_draw_symbol(b->x, b->y, frame_sym);
-
-        const struct sprite_slice *s = (frame_sym < SYMBOL_COUNT) ? &SYMBOL_SLICES[frame_sym] : NULL;
-        int fw = s ? s->width : b->width;
-        int fh = s ? s->height : b->height;
-
-        if (fw >= 10 && fh >= 6 && level > 0) {
-            int inner_x = b->x + 2;
-            int inner_y = b->y + 2;
-            int inner_w = fw - 5;
-            int inner_h = fh - 4;
-            if (inner_w > 0 && inner_h > 0) {
-                int fill_w = ((int)level * inner_w + 50) / 100;
-                if (fill_w < 1 && level > 0) fill_w = 1;
-                if (fill_w > inner_w) fill_w = inner_w;
-                v_fill_rect(inner_x, inner_y, fill_w, inner_h, 1);
-            }
-        }
-    }
-}
-
 static void draw_block_widget(const struct display_layout_block *b, const struct custom_status_state *state, bool is_idle) {
     if (!b || !b->enabled) return;
 
     switch (b->type) {
     case WIDGET_TYPE_OUTPUT_STATUS: {
         if (b->mode == 1) {
-            // Font mode
             if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
-                const char *txt = (b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] : (b->custom_text ? b->custom_text : "USB");
-                v_draw_text(b->x, b->y, v_get_text_font(), txt);
+                v_draw_text(b->x, b->y, &font_text, b->custom_text ? b->custom_text : "USB");
             } else {
-                int p = state->active_profile_index;
-                if (b->text_count > p + 1 && b->text_entries[p + 1]) {
-                    v_draw_text(b->x, b->y, v_get_text_font(), b->text_entries[p + 1]);
-                } else {
-                    char buf[8];
-                    snprintf(buf, sizeof(buf), "P%d", p + 1);
-                    v_draw_text(b->x, b->y, v_get_text_font(), buf);
-                }
+                char buf[8];
+                snprintf(buf, sizeof(buf), "P%d", state->active_profile_index + 1);
+                v_draw_text(b->x, b->y, &font_text, buf);
             }
         } else {
-            // Symbol mode
             if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
-                uint16_t sym = (b->symbol_count > 0) ? b->symbol_ids[0] : b->symbol_id;
-                v_draw_symbol(b->x, b->y, sym);
+                v_draw_symbol(b->x, b->y, SYMBOL_USB);
             } else {
-                int p = state->active_profile_index;
-                uint16_t sym;
-                if (b->symbol_count > p + 1) {
-                    sym = b->symbol_ids[p + 1];
-                } else if (b->symbol_count > 1) {
-                    sym = b->symbol_ids[1];
-                } else if (b->symbol_count > 0) {
-                    sym = b->symbol_ids[0];
-                } else {
-                    sym = b->symbol_id;
-                }
-                v_draw_symbol(b->x, b->y, sym);
-
-                // If only generic BT icon is provided, overlay active profile letter/digit
-                if (b->symbol_count <= 2 && state->active_profile_connected) {
-                    if (p >= 0 && p < 26) {
-                        v_draw_char(b->x + 6, b->y + 6, v_get_text_font(), 'A' + p);
+                v_draw_symbol(b->x, b->y, SYMBOL_BLUETOOTH);
+                if (state->active_profile_connected) {
+                    int prof = state->active_profile_index;
+                    if (prof >= 0 && prof < 26) {
+                        v_draw_char(b->x + 6, b->y + 6, &font_text, 'A' + prof);
                     }
                 }
             }
@@ -448,31 +436,31 @@ static void draw_block_widget(const struct display_layout_block *b, const struct
     }
 
     case WIDGET_TYPE_BATTERY: {
-        draw_battery_widget(b, state->battery_level, state->charging);
+        if (b->mode == 1) {
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%d%%", state->battery_level);
+            v_draw_text(b->x, b->y, &font_text, buf);
+        } else {
+            draw_battery_at(b->x, b->y, state->battery_level);
+        }
         break;
     }
 
     case WIDGET_TYPE_LAYER: {
         uint8_t layer = state->active_layer;
         if (b->mode == 1) {
-            // Font mode
-            if (b->text_count > 0 && layer < b->text_count && b->text_entries[layer]) {
-                v_draw_text(b->x, b->y, v_get_text_font(), b->text_entries[layer]);
-            } else if (state->layer_name[0]) {
-                v_draw_text(b->x, b->y, v_get_text_font(), state->layer_name);
-            } else if (b->custom_text && b->custom_text[0]) {
-                v_draw_text(b->x, b->y, v_get_text_font(), b->custom_text);
-            } else {
-                char buf[8];
-                snprintf(buf, sizeof(buf), "L%d", layer);
-                v_draw_text(b->x, b->y, v_get_text_font(), buf);
-            }
+            const char *names[] = { "QWERTY", "LOWER", "RAISE", "ADJUST" };
+            const char *layer_name = (b->custom_text && b->custom_text[0]) ? b->custom_text : ((layer < 4) ? names[layer] : "OTHER");
+            v_draw_text(b->x, b->y, &font_text, layer_name);
         } else {
-            // Symbol mode
-            if (b->symbol_count > 0) {
-                v_draw_symbol(b->x, b->y, b->symbol_ids[layer % b->symbol_count]);
+            if (layer == 1) {
+                v_draw_text(b->x, b->y, &font_text, "QWERTY");
             } else {
-                v_draw_symbol(b->x, b->y, b->symbol_id);
+                uint8_t idx = 0;
+                if (layer >= 2 && layer <= 4) {
+                    idx = layer - 1;
+                }
+                v_draw_symbol(b->x, b->y, SYMBOL_BRACKET_LAYER(idx));
             }
         }
         break;
@@ -480,87 +468,73 @@ static void draw_block_widget(const struct display_layout_block *b, const struct
 
     case WIDGET_TYPE_WPM: {
         if (b->mode == 1) {
-            // Font mode
-            if (b->text_count >= 2) {
-                int target = b->param2 > 0 ? b->param2 : 100;
-                int idx = ((int)state->wpm * (b->text_count - 1)) / target;
-                if (idx >= b->text_count) idx = b->text_count - 1;
-                v_draw_text(b->x, b->y, v_get_text_font(), b->text_entries[idx]);
-            } else {
-                char buf[12];
-                snprintf(buf, sizeof(buf), "%d WPM", state->wpm);
-                v_draw_text(b->x, b->y, v_get_text_font(), buf);
-            }
+            char buf[12];
+            snprintf(buf, sizeof(buf), "%d WPM", state->wpm);
+            v_draw_text(b->x, b->y, &font_text, buf);
         } else {
-            // Symbol mode
-            if (b->symbol_count >= 2) {
-                int target = b->param2 > 0 ? b->param2 : 100;
-                int idx = ((int)state->wpm * (b->symbol_count - 1)) / target;
-                if (idx >= b->symbol_count) idx = b->symbol_count - 1;
-                v_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
-            } else {
-                // Digits readout
+            if (state->wpm > 0) {
                 char buf[4];
-                snprintf(buf, sizeof(buf), "%d", state->wpm);
-                v_draw_text(b->x, b->y, v_get_digits_font(), buf);
+                buf[0] = '0' + ((state->wpm / 100) % 10);
+                buf[1] = '0' + ((state->wpm / 10) % 10);
+                buf[2] = '0' + (state->wpm % 10);
+                buf[3] = '\0';
+                v_draw_text(b->x, b->y, &font_digits, buf);
+            }
+            int num_arrows = 0;
+            if (state->wpm > 0) {
+                num_arrows = (state->wpm >= 100) ? 7 : (state->wpm * 7 + 50) / 100;
+                if (num_arrows < 1) num_arrows = 1;
+                if (num_arrows > 7) num_arrows = 7;
+            }
+            for (int slot = 0; slot < 7; slot++) {
+                int sx = b->x + 1 + slot * 4;
+                v_draw_symbol(sx, b->y + 12, slot < num_arrows ? SYMBOL_ARROW_HEAD : SYMBOL_ARROW_DOT);
             }
         }
         break;
     }
 
     case WIDGET_TYPE_WPM_CHART: {
-        draw_wpm_chart(b->x, b->y, b->width, b->height, b->param1, b->param2);
+        draw_wpm_chart(b->x, b->y, b->width, b->height, state->wpm, b->param1, b->param2);
         break;
     }
 
     case WIDGET_TYPE_BRANDING: {
-        const char *text = (b->custom_text && b->custom_text[0])
-            ? b->custom_text
-            : ((b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] : CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME);
-        int total_w = v_measure_text(v_get_text_font(), text);
+        const char *text = (b->custom_text && b->custom_text[0]) ? b->custom_text : CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME;
+        int total_w = v_measure_text(&font_text, text);
         int sx = b->x;
         if (b->width > total_w) {
             sx = b->x + (b->width - total_w) / 2;
         }
-        v_draw_text(sx, b->y, v_get_text_font(), text);
+        v_draw_text(sx, b->y, &font_text, text);
         break;
     }
 
     case WIDGET_TYPE_SPLIT: {
-        if (b->mode == 1) {
-            // Font mode
-            const char *txt = state->split_connected
-                ? ((b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] : "OK")
-                : ((b->text_count > 1 && b->text_entries[1]) ? b->text_entries[1] : "NC");
-            v_draw_text(b->x, b->y, v_get_text_font(), txt);
-        } else {
-            // Symbol mode
-            uint16_t sym = state->split_connected
-                ? ((b->symbol_count > 0) ? b->symbol_ids[0] : b->symbol_id)
-                : ((b->symbol_count > 1) ? b->symbol_ids[1] : b->symbol_id);
-            v_draw_symbol(b->x, b->y, sym);
-        }
+        v_draw_symbol(b->x, b->y, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
         break;
     }
 
     case WIDGET_TYPE_SCREENSAVER: {
-        if (b->symbol_count > 1) {
-            v_draw_symbol(b->x, b->y, b->symbol_ids[state->active_layer % b->symbol_count]);
-        } else if (b->symbol_count > 0) {
-            v_draw_symbol(b->x, b->y, b->symbol_ids[0]);
-        } else {
-            v_draw_symbol(b->x, b->y, b->symbol_id);
+        enum symbol_id sym = (b->symbol_id < SYMBOL_COUNT) ? (enum symbol_id)b->symbol_id : SYMBOL_SKULL_LAYER_0;
+        if (!is_idle && sym >= SYMBOL_SKULL_LAYER_0 && sym <= SYMBOL_SKULL_LAYER_3) {
+            uint8_t layer = state->active_layer;
+            if (layer == 1) {
+                sym = SYMBOL_SKULL_LAYER_0;
+            } else {
+                uint8_t idx = 0;
+                if (layer >= 2 && layer <= 4) {
+                    idx = layer - 1;
+                }
+                sym = SYMBOL_SKULL_LAYER(idx);
+            }
         }
+        v_draw_symbol(b->x, b->y, sym);
         break;
     }
 
     case WIDGET_TYPE_CAPS_LOCK: {
-        if (b->mode == 1) {
-            v_draw_text(b->x, b->y, v_get_text_font(), "CAPS");
-        } else {
-            uint16_t sym = (b->symbol_count > 0) ? b->symbol_ids[0] : b->symbol_id;
-            v_draw_symbol(b->x, b->y, sym);
-        }
+        v_draw_text(b->x, b->y, &font_text, "CAPS");
         break;
     }
 
@@ -570,11 +544,100 @@ static void draw_block_widget(const struct display_layout_block *b, const struct
 }
 
 static void draw_blocks(const struct display_layout_block *blocks, size_t count, const struct custom_status_state *state, bool is_idle) {
-    if (!blocks) return;
     for (size_t i = 0; i < count; i++) {
+        if (!blocks[i].enabled) continue;
         draw_block_widget(&blocks[i], state, is_idle);
     }
 }
+#endif
+
+static void draw_idle_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_LEFT_IDLE_BLOCKS, LAYOUT_LEFT_IDLE_COUNT, state, true);
+#else
+    // 1. Skull looking straight forward (layer 0) at y=47..69, x=3..28 (26x23)
+    v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER_0);
+
+    // 2. Custom pixel text at y=73..77
+    const char *user_name = CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME;
+    int total_w = v_measure_text(&font_text, user_name);
+    int start_x = (DISPLAY_VIRTUAL_WIDTH - total_w + 1) / 2;
+    if (start_x < 0) start_x = 0;
+    v_draw_text(start_x, 73, &font_text, user_name);
+
+    // 3. Split connection icon at y=116..124, x=10..22 (13x9)
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
+}
+
+static void draw_active_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_LEFT_ACTIVE_BLOCKS, LAYOUT_LEFT_ACTIVE_COUNT, state, false);
+#else
+    // 1. Connection icon (USB vs Bluetooth)
+    if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
+        // USB cable and connector icon at x=0, y=0 (12x10)
+        v_draw_symbol(0, 0, SYMBOL_USB);
+    } else {
+        // Bluetooth icon at x=2, y=3 (8x8)
+        v_draw_symbol(2, 3, SYMBOL_BLUETOOTH);
+
+        // Profile Letter: only if connected
+        if (state->active_profile_connected) {
+            int prof = state->active_profile_index;
+            if (prof >= 0 && prof < 26) {
+                v_draw_char(8, 9, &font_text, 'A' + prof);
+            }
+        }
+    }
+
+    // 2. Battery icon at x=13..29, y=3..12
+    draw_battery(state->battery_level);
+
+    // 3. Layer indicator: "QWERTY" text when on Qwerty base layer, else brackets
+    uint8_t layer = state->active_layer;
+    if (layer == 1) {
+        draw_qwerty_label();
+        v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER_0);
+    } else {
+        uint8_t idx = 0;
+        if (layer >= 2 && layer <= 4) {
+            idx = layer - 1; // 2->1 (RightHold), 3->2 (LeftHold), 4->3 (SimmHold)
+        }
+        v_draw_symbol(5, 25, SYMBOL_BRACKET_LAYER(idx));
+        v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER(idx));
+    }
+
+    // 5. WPM digits and arrow progress bar at y=83..99
+    draw_wpm_and_arrows(state->wpm);
+
+    // 6. Split connection icon at y=116..124, x=10..22 (13x9)
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
+}
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static void draw_peripheral_idle_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_RIGHT_IDLE_BLOCKS, LAYOUT_RIGHT_IDLE_COUNT, state, true);
+#else
+    // Idle screen: keep only the connection symbol at bottom (x=10, y=116, 13x9)
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
+}
+
+static void draw_peripheral_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_RIGHT_ACTIVE_BLOCKS, LAYOUT_RIGHT_ACTIVE_COUNT, state, false);
+#else
+    // 1. Centered battery icon at top (x=7, y=3) without USB or Bluetooth icon
+    draw_battery_at(7, 3, state->battery_level);
+
+    // 2. Module connection symbol at bottom (x=10, y=116, 13x9)
+    v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
+}
+#endif
 
 static void render_screen(const struct custom_status_state *state) {
     if (!canvas_obj) return;
@@ -583,19 +646,19 @@ static void render_screen(const struct custom_status_state *state) {
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     if (state->is_idle) {
-        draw_blocks(LAYOUT_RIGHT_IDLE_BLOCKS, LAYOUT_RIGHT_IDLE_COUNT, state, true);
+        draw_peripheral_idle_screen(state);
     } else {
-        draw_blocks(LAYOUT_RIGHT_ACTIVE_BLOCKS, LAYOUT_RIGHT_ACTIVE_COUNT, state, false);
+        draw_peripheral_screen(state);
     }
 #else
     if (state->is_idle) {
-        draw_blocks(LAYOUT_LEFT_IDLE_BLOCKS, LAYOUT_LEFT_IDLE_COUNT, state, true);
+        draw_idle_screen(state);
     } else {
-        draw_blocks(LAYOUT_LEFT_ACTIVE_BLOCKS, LAYOUT_LEFT_ACTIVE_COUNT, state, false);
+        draw_active_screen(state);
     }
 #endif
 
-    // Map virtual buffer to hardware canvas buffer with rotation & color inversion
+    // Map virtual buffer to hardware canvas buffer
     for (int vy = 0; vy < DISPLAY_VIRTUAL_HEIGHT; vy++) {
         for (int vx = 0; vx < DISPLAY_VIRTUAL_WIDTH; vx++) {
 #if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_270)
@@ -625,9 +688,11 @@ static void custom_status_update_cb(struct custom_status_state state) {
     if (state_has_rendered && memcmp(&last_rendered_state, &state, sizeof(state)) == 0) {
         return;
     }
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
     if (!state_has_rendered || state.wpm != last_rendered_state.wpm) {
         update_wpm_history(state.wpm);
     }
+#endif
     last_rendered_state = state;
     state_has_rendered = true;
     render_screen(&state);
@@ -647,7 +712,7 @@ static struct custom_status_state custom_status_get_state(const zmk_event_t *eh)
 #endif
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    // Central half: endpoints, layers, BLE, WPM, and split central status
+    // Endpoint status
     s.selected_endpoint = zmk_endpoints_selected();
 #if IS_ENABLED(CONFIG_ZMK_BLE)
     s.active_profile_index = zmk_ble_active_profile_index();
@@ -657,10 +722,6 @@ static struct custom_status_state custom_status_get_state(const zmk_event_t *eh)
 
     // Layer status
     s.active_layer = zmk_keymap_highest_layer_active();
-    const char *lname = zmk_keymap_layer_name(zmk_keymap_layer_index_to_id(s.active_layer));
-    if (lname) {
-        strncpy(s.layer_name, lname, sizeof(s.layer_name) - 1);
-    }
 
     // WPM status
 #if IS_ENABLED(CONFIG_ZMK_WPM)
