@@ -289,3 +289,100 @@ static const struct display_font font_default = {
     .line_height = 10,
     .space_advance = 3,
 };
+
+/* Interactive Screen Layout & Widget Architecture */
+#define HAS_CUSTOM_LAYOUT_BLOCKS 1
+
+enum display_widget_type {
+    WIDGET_TYPE_NONE = 0,
+    WIDGET_TYPE_OUTPUT_STATUS,
+    WIDGET_TYPE_BATTERY,
+    WIDGET_TYPE_LAYER,
+    WIDGET_TYPE_WPM,
+    WIDGET_TYPE_WPM_CHART,
+    WIDGET_TYPE_BRANDING,
+    WIDGET_TYPE_SPLIT,
+    WIDGET_TYPE_SCREENSAVER,
+    WIDGET_TYPE_CAPS_LOCK,
+};
+
+struct display_layout_block {
+    uint8_t type;
+    int16_t x;
+    int16_t y;
+    uint8_t width;
+    uint8_t height;
+    bool enabled;
+    uint8_t mode;
+    int16_t param1;
+    int16_t param2;
+    const char *custom_text;
+    uint16_t symbol_id;
+};
+
+static const struct display_layout_block LAYOUT_LEFT_ACTIVE_BLOCKS[6] = {
+    { .type = WIDGET_TYPE_OUTPUT_STATUS, .x = 0, .y = 0, .width = 12, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_USB },
+    { .type = WIDGET_TYPE_BATTERY, .x = 13, .y = 3, .width = 17, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_BATTERY_FRAME },
+    { .type = WIDGET_TYPE_LAYER, .x = 5, .y = 25, .width = 24, .height = 12, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_BRACKET_LAYER_0 },
+    { .type = WIDGET_TYPE_SCREENSAVER, .x = 3, .y = 47, .width = 26, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SKULL_LAYER_0 },
+    { .type = WIDGET_TYPE_WPM, .x = 2, .y = 83, .width = 28, .height = 18, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_ARROW_HEAD },
+    { .type = WIDGET_TYPE_SPLIT, .x = 10, .y = 116, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
+};
+#define LAYOUT_LEFT_ACTIVE_COUNT 6
+
+static const struct display_layout_block LAYOUT_LEFT_IDLE_BLOCKS[3] = {
+    { .type = WIDGET_TYPE_SCREENSAVER, .x = 3, .y = 47, .width = 26, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SKULL_LAYER_0 },
+    { .type = WIDGET_TYPE_BRANDING, .x = 3, .y = 73, .width = 26, .height = 5, .enabled = true, .mode = 1, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = 0 },
+    { .type = WIDGET_TYPE_SPLIT, .x = 10, .y = 116, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
+};
+#define LAYOUT_LEFT_IDLE_COUNT 3
+
+static const struct display_layout_block LAYOUT_RIGHT_ACTIVE_BLOCKS[2] = {
+    { .type = WIDGET_TYPE_BATTERY, .x = 7, .y = 3, .width = 17, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_BATTERY_FRAME },
+    { .type = WIDGET_TYPE_SPLIT, .x = 10, .y = 116, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
+};
+#define LAYOUT_RIGHT_ACTIVE_COUNT 2
+
+static const struct display_layout_block LAYOUT_RIGHT_IDLE_BLOCKS[1] = {
+    { .type = WIDGET_TYPE_SPLIT, .x = 10, .y = 116, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
+};
+#define LAYOUT_RIGHT_IDLE_COUNT 1
+
+/* ZMK_DISPLAY_STUDIO_METADATA
+{
+  "version": 1,
+  "screenDimensions": {
+    "width": 32,
+    "height": 128
+  },
+  "leftBlocks": [
+    { "id": "left-output", "widgetType": "connection", "instanceId": "inst_left_output", "name": "Output Status", "x": 0, "y": 0, "width": 12, "height": 10, "enabled": true, "side": "left" },
+    { "id": "left-battery", "widgetType": "battery", "instanceId": "inst_left_battery", "name": "Battery Meter", "x": 13, "y": 3, "width": 17, "height": 10, "enabled": true, "side": "left" },
+    { "id": "left-layer", "widgetType": "layer-banner", "instanceId": "inst_left_layer", "name": "Layer Banner", "x": 5, "y": 25, "width": 24, "height": 12, "enabled": true, "side": "left" },
+    { "id": "left-screensaver", "widgetType": "screensaver", "instanceId": "inst_left_screensaver", "name": "Mascot Image", "x": 3, "y": 47, "width": 26, "height": 23, "enabled": true, "side": "left" },
+    { "id": "left-wpm", "widgetType": "wpm", "instanceId": "inst_left_wpm", "name": "WPM Gauge", "x": 2, "y": 83, "width": 28, "height": 18, "enabled": true, "side": "left" },
+    { "id": "left-split", "widgetType": "split", "instanceId": "inst_left_split", "name": "Split Link", "x": 10, "y": 116, "width": 13, "height": 9, "enabled": true, "side": "left" }
+  ],
+  "idleLeftBlocks": [
+    { "id": "idle-left-screensaver", "widgetType": "screensaver", "instanceId": "inst_idle_left_screensaver", "name": "Mascot Image", "x": 3, "y": 47, "width": 26, "height": 23, "enabled": true, "side": "left" },
+    { "id": "idle-left-branding", "widgetType": "branding", "instanceId": "inst_idle_left_branding", "name": "SCYAN", "x": 3, "y": 73, "width": 26, "height": 5, "enabled": true, "side": "left" },
+    { "id": "idle-left-split", "widgetType": "split", "instanceId": "inst_idle_left_split", "name": "Split Link", "x": 10, "y": 116, "width": 13, "height": 9, "enabled": true, "side": "left" }
+  ],
+  "rightBlocks": [
+    { "id": "right-battery", "widgetType": "battery", "instanceId": "inst_right_battery", "name": "Battery Meter", "x": 7, "y": 3, "width": 17, "height": 10, "enabled": true, "side": "right" },
+    { "id": "right-split", "widgetType": "split", "instanceId": "inst_right_split", "name": "Split Link", "x": 10, "y": 116, "width": 13, "height": 9, "enabled": true, "side": "right" }
+  ],
+  "idleRightBlocks": [
+    { "id": "idle-right-split", "widgetType": "split", "instanceId": "inst_idle_right_split", "name": "Split Link", "x": 10, "y": 116, "width": 13, "height": 9, "enabled": true, "side": "right" }
+  ],
+  "widgetInstances": {
+    "connection": [{ "id": "inst_left_output", "widgetTypeId": "connection", "label": "Output Status", "config": { "mode": "symbol" } }],
+    "battery": [{ "id": "inst_left_battery", "widgetTypeId": "battery", "label": "Battery Meter", "config": { "mode": "symbol" } }],
+    "layer-banner": [{ "id": "inst_left_layer", "widgetTypeId": "layer-banner", "label": "Layer Banner", "config": { "mode": "symbol" } }],
+    "screensaver": [{ "id": "inst_left_screensaver", "widgetTypeId": "screensaver", "label": "Mascot Image", "config": { "mode": "symbol", "groupId": "SYMBOL_SKULL_LAYER_0" } }],
+    "wpm": [{ "id": "inst_left_wpm", "widgetTypeId": "wpm", "label": "WPM Gauge", "config": { "mode": "symbol" } }],
+    "branding": [{ "id": "inst_idle_left_branding", "widgetTypeId": "branding", "label": "User Branding", "config": { "mode": "font", "textEntries": ["SCYAN"] } }],
+    "split": [{ "id": "inst_left_split", "widgetTypeId": "split", "label": "Split Link", "config": { "mode": "symbol" } }]
+  }
+}
+*/

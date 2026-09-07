@@ -5,6 +5,7 @@
 
 #include <zephyr/kernel.h>
 #include <string.h>
+#include <stdio.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -362,7 +363,198 @@ static void draw_qwerty_label(void) {
     v_draw_text(0, 28, &font_text, "QWERTY");
 }
 
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+#define WPM_HISTORY_MAX 32
+static uint8_t wpm_history[WPM_HISTORY_MAX];
+static uint8_t wpm_history_idx = 0;
+static uint8_t wpm_history_count = 0;
+
+static void update_wpm_history(uint8_t wpm) {
+    wpm_history[wpm_history_idx] = wpm;
+    wpm_history_idx = (wpm_history_idx + 1) % WPM_HISTORY_MAX;
+    if (wpm_history_count < WPM_HISTORY_MAX) {
+        wpm_history_count++;
+    }
+}
+
+static void draw_wpm_chart(int x, int y, int w, int h, uint8_t current_wpm, int grid_size, int target_speed) {
+    if (w <= 0 || h <= 0) return;
+    if (target_speed <= 0) target_speed = 100;
+
+    // Baseline dots
+    for (int col = 0; col < w; col += 2) {
+        v_set_pixel(x + col, y + h - 1, 1);
+    }
+
+    int num_samples = (wpm_history_count > 0) ? wpm_history_count : 1;
+    int step = (wpm_history_count > 0 && wpm_history_count < w) ? (w / wpm_history_count) : 1;
+    if (step < 1) step = 1;
+
+    for (int i = 0; i < num_samples && i * step < w; i++) {
+        int hist_pos = (wpm_history_count == WPM_HISTORY_MAX)
+            ? (wpm_history_idx + i) % WPM_HISTORY_MAX
+            : i;
+        uint8_t sample_wpm = wpm_history[hist_pos];
+        int bar_h = (sample_wpm * (h - 2)) / target_speed;
+        if (bar_h > h - 2) bar_h = h - 2;
+        if (bar_h < 1 && sample_wpm > 0) bar_h = 1;
+
+        int px = x + i * step;
+        for (int r = 0; r < bar_h; r++) {
+            v_set_pixel(px, y + h - 2 - r, 1);
+        }
+    }
+}
+
+static void draw_block_widget(const struct display_layout_block *b, const struct custom_status_state *state) {
+    if (!b || !b->enabled) return;
+
+    switch (b->type) {
+    case WIDGET_TYPE_OUTPUT_STATUS: {
+        if (b->mode == 1) {
+            if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
+                v_draw_text(b->x, b->y, &font_text, b->custom_text ? b->custom_text : "USB");
+            } else {
+                char buf[8];
+                snprintf(buf, sizeof(buf), "P%d", state->active_profile_index + 1);
+                v_draw_text(b->x, b->y, &font_text, buf);
+            }
+        } else {
+            if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
+                v_draw_symbol(b->x, b->y, SYMBOL_USB);
+            } else {
+                v_draw_symbol(b->x, b->y, SYMBOL_BLUETOOTH);
+                if (state->active_profile_connected) {
+                    int prof = state->active_profile_index;
+                    if (prof >= 0 && prof < 26) {
+                        v_draw_char(b->x + 6, b->y + 6, &font_text, 'A' + prof);
+                    }
+                }
+            }
+        }
+        break;
+    }
+
+    case WIDGET_TYPE_BATTERY: {
+        if (b->mode == 1) {
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%d%%", state->battery_level);
+            v_draw_text(b->x, b->y, &font_text, buf);
+        } else {
+            draw_battery_at(b->x, b->y, state->battery_level);
+        }
+        break;
+    }
+
+    case WIDGET_TYPE_LAYER: {
+        uint8_t layer = state->active_layer;
+        if (b->mode == 1) {
+            const char *names[] = { "QWERTY", "LOWER", "RAISE", "ADJUST" };
+            const char *layer_name = (b->custom_text && b->custom_text[0]) ? b->custom_text : ((layer < 4) ? names[layer] : "OTHER");
+            v_draw_text(b->x, b->y, &font_text, layer_name);
+        } else {
+            if (layer == 1) {
+                v_draw_text(b->x, b->y, &font_text, "QWERTY");
+            } else {
+                uint8_t idx = 0;
+                if (layer >= 2 && layer <= 4) {
+                    idx = layer - 1;
+                }
+                v_draw_symbol(b->x, b->y, SYMBOL_BRACKET_LAYER(idx));
+            }
+        }
+        break;
+    }
+
+    case WIDGET_TYPE_WPM: {
+        if (b->mode == 1) {
+            char buf[12];
+            snprintf(buf, sizeof(buf), "%d WPM", state->wpm);
+            v_draw_text(b->x, b->y, &font_text, buf);
+        } else {
+            if (state->wpm > 0) {
+                char buf[4];
+                buf[0] = '0' + ((state->wpm / 100) % 10);
+                buf[1] = '0' + ((state->wpm / 10) % 10);
+                buf[2] = '0' + (state->wpm % 10);
+                buf[3] = '\0';
+                v_draw_text(b->x, b->y, &font_digits, buf);
+            }
+            int num_arrows = 0;
+            if (state->wpm > 0) {
+                num_arrows = (state->wpm >= 100) ? 7 : (state->wpm * 7 + 50) / 100;
+                if (num_arrows < 1) num_arrows = 1;
+                if (num_arrows > 7) num_arrows = 7;
+            }
+            for (int slot = 0; slot < 7; slot++) {
+                int sx = b->x + 1 + slot * 4;
+                v_draw_symbol(sx, b->y + 12, slot < num_arrows ? SYMBOL_ARROW_HEAD : SYMBOL_ARROW_DOT);
+            }
+        }
+        break;
+    }
+
+    case WIDGET_TYPE_WPM_CHART: {
+        draw_wpm_chart(b->x, b->y, b->width, b->height, state->wpm, b->param1, b->param2);
+        break;
+    }
+
+    case WIDGET_TYPE_BRANDING: {
+        const char *text = (b->custom_text && b->custom_text[0]) ? b->custom_text : CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME;
+        int total_w = v_measure_text(&font_text, text);
+        int sx = b->x;
+        if (b->width > total_w) {
+            sx = b->x + (b->width - total_w) / 2;
+        }
+        v_draw_text(sx, b->y, &font_text, text);
+        break;
+    }
+
+    case WIDGET_TYPE_SPLIT: {
+        v_draw_symbol(b->x, b->y, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+        break;
+    }
+
+    case WIDGET_TYPE_SCREENSAVER: {
+        enum symbol_id sym = (b->symbol_id < SYMBOL_COUNT) ? (enum symbol_id)b->symbol_id : SYMBOL_SKULL_LAYER_0;
+        if (!is_idle && sym >= SYMBOL_SKULL_LAYER_0 && sym <= SYMBOL_SKULL_LAYER_3) {
+            uint8_t layer = state->active_layer;
+            if (layer == 1) {
+                sym = SYMBOL_SKULL_LAYER_0;
+            } else {
+                uint8_t idx = 0;
+                if (layer >= 2 && layer <= 4) {
+                    idx = layer - 1;
+                }
+                sym = SYMBOL_SKULL_LAYER(idx);
+            }
+        }
+        v_draw_symbol(b->x, b->y, sym);
+        break;
+    }
+
+    case WIDGET_TYPE_CAPS_LOCK: {
+        v_draw_text(b->x, b->y, &font_text, "CAPS");
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+static void draw_blocks(const struct display_layout_block *blocks, size_t count, const struct custom_status_state *state, bool is_idle) {
+    for (size_t i = 0; i < count; i++) {
+        if (!blocks[i].enabled) continue;
+        draw_block_widget(&blocks[i], state, is_idle);
+    }
+}
+#endif
+
 static void draw_idle_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_LEFT_IDLE_BLOCKS, LAYOUT_LEFT_IDLE_COUNT, state, true);
+#else
     // 1. Skull looking straight forward (layer 0) at y=47..69, x=3..28 (26x23)
     v_draw_symbol(3, 47, SYMBOL_SKULL_LAYER_0);
 
@@ -375,9 +567,13 @@ static void draw_idle_screen(const struct custom_status_state *state) {
 
     // 3. Split connection icon at y=116..124, x=10..22 (13x9)
     v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
 }
 
 static void draw_active_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_LEFT_ACTIVE_BLOCKS, LAYOUT_LEFT_ACTIVE_COUNT, state, false);
+#else
     // 1. Connection icon (USB vs Bluetooth)
     if (state->selected_endpoint.transport == ZMK_TRANSPORT_USB) {
         // USB cable and connector icon at x=0, y=0 (12x10)
@@ -417,20 +613,29 @@ static void draw_active_screen(const struct custom_status_state *state) {
 
     // 6. Split connection icon at y=116..124, x=10..22 (13x9)
     v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
 }
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 static void draw_peripheral_idle_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_RIGHT_IDLE_BLOCKS, LAYOUT_RIGHT_IDLE_COUNT, state, true);
+#else
     // Idle screen: keep only the connection symbol at bottom (x=10, y=116, 13x9)
     v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
 }
 
 static void draw_peripheral_screen(const struct custom_status_state *state) {
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    draw_blocks(LAYOUT_RIGHT_ACTIVE_BLOCKS, LAYOUT_RIGHT_ACTIVE_COUNT, state, false);
+#else
     // 1. Centered battery icon at top (x=7, y=3) without USB or Bluetooth icon
     draw_battery_at(7, 3, state->battery_level);
 
     // 2. Module connection symbol at bottom (x=10, y=116, 13x9)
     v_draw_symbol(10, 116, state->split_connected ? SYMBOL_SPLIT_CONNECTED : SYMBOL_SPLIT_DISCONNECTED);
+#endif
 }
 #endif
 
@@ -453,14 +658,14 @@ static void render_screen(const struct custom_status_state *state) {
     }
 #endif
 
-    // Map 32x128 virtual buffer to 128x32 hardware canvas buffer
+    // Map virtual buffer to hardware canvas buffer
     for (int vy = 0; vy < DISPLAY_VIRTUAL_HEIGHT; vy++) {
         for (int vx = 0; vx < DISPLAY_VIRTUAL_WIDTH; vx++) {
 #if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_270)
             int hx = vy;
-            int hy = 31 - vx;
+            int hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
 #else
-            int hx = 127 - vy;
+            int hx = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
             int hy = vx;
 #endif
 #if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_INVERT)
@@ -483,6 +688,11 @@ static void custom_status_update_cb(struct custom_status_state state) {
     if (state_has_rendered && memcmp(&last_rendered_state, &state, sizeof(state)) == 0) {
         return;
     }
+#if defined(HAS_CUSTOM_LAYOUT_BLOCKS)
+    if (!state_has_rendered || state.wpm != last_rendered_state.wpm) {
+        update_wpm_history(state.wpm);
+    }
+#endif
     last_rendered_state = state;
     state_has_rendered = true;
     render_screen(&state);
