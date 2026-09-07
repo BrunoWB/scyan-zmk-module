@@ -6,6 +6,7 @@ if (CONFIG_ZMK_DISPLAY_STATUS_SCREEN_CUSTOM)
     target_include_directories(app BEFORE PRIVATE
       ${ZMK_CONFIG}/include
       ${ZMK_CONFIG}
+      ${ZMK_CONFIG}/../include
     )
   endif()
   target_include_directories(app PRIVATE
