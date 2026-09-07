@@ -406,7 +406,7 @@ static void draw_wpm_chart(int x, int y, int w, int h, uint8_t current_wpm, int 
     }
 }
 
-static void draw_block_widget(const struct display_layout_block *b, const struct custom_status_state *state) {
+static void draw_block_widget(const struct display_layout_block *b, const struct custom_status_state *state, bool is_idle) {
     if (!b || !b->enabled) return;
 
     switch (b->type) {
