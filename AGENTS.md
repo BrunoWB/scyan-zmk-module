@@ -19,7 +19,7 @@ Persistent architectural reference for Antigravity pair programming in `scyan-zm
 ## 2. Unidirectional Data Pipeline
 
 ```
-[scyan-zmk-studio] ──(generates)──> [custom_display_assets.h in zmk-config]
+[scyan-zmk-studio] ──(generates)──> [scyan_assets.h in zmk-config]
                                                     │
                                                     ▼
                                     [scyan-zmk-module] (Here)

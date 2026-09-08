@@ -43,7 +43,7 @@ static void engine_render(const struct custom_status_state *state) {
     canvas_clear();
 
     bool is_central;
-#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL)
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
     is_central = (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
 #else
     is_central = (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
@@ -123,14 +123,14 @@ uint8_t engine_get_wpm_tick(void) {
     return wpm_ticker_state;
 }
 
-#ifndef CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS
-#define CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS 60
+#ifndef CONFIG_SCYAN_BONGO_TAP_MS
+#define CONFIG_SCYAN_BONGO_TAP_MS 60
 #endif
 
 void engine_bongo_tap(bool is_left) {
     current_bongo_state = is_left ? 1 : 2;
     engine_trigger_refresh();
-    k_work_reschedule(&bongo_idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS));
+    k_work_reschedule(&bongo_idle_work, K_MSEC(CONFIG_SCYAN_BONGO_TAP_MS));
 }
 
 uint8_t engine_get_bongo_state(void) {
@@ -143,7 +143,7 @@ void engine_notify_activity(void) {
         engine_trigger_refresh();
         k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
     }
-    k_work_reschedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
+    k_work_reschedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
 }
 
 bool engine_is_idle(void) {
@@ -162,7 +162,7 @@ void engine_init(lv_obj_t *canvas_obj) {
     wpm_ticker_state = 0;
 
     k_work_init_delayable(&idle_work, idle_work_cb);
-    k_work_schedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
+    k_work_schedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
 
     k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
     k_work_init_delayable(&wpm_ticker_work, wpm_ticker_work_cb);

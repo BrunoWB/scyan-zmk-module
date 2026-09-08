@@ -21,13 +21,13 @@ It interprets 2-Atlas spritesheets, custom font glyphs, and dynamic screen layou
 +---------------------------+       +---------------------------+       +---------------------------+
 |  brunowb/scyan-zmk-studio | ----> |    brunowb/zmk-config     | <---- |  brunowb/scyan-zmk-module |
 | (Interactive Web Layout UI|  git  | (User Keymap, Config & CI)|  West |   (Display Engine Module) |
-| & 2-Atlas Sprite Editor)  | push  | custom_display_assets.h   | Module|     [This Repository]     |
+| & 2-Atlas Sprite Editor)  | push  | scyan_assets.h            | Module|     [This Repository]     |
 +---------------------------+       +---------------------------+       +---------------------------+
 ```
 
-1. **[Scyan ZMK Studio](https://github.com/BrunoWB/scyan-zmk-studio)**: Visual web app to draw 1bpp monochrome icons, customize fonts, and organize active & idle widget blocks via drag-and-drop. It commits `config/custom_display_assets.h` into your `zmk-config` repository.
+1. **[Scyan ZMK Studio](https://github.com/BrunoWB/scyan-zmk-studio)**: Visual web app to draw 1bpp monochrome icons, customize fonts, and organize active & idle widget blocks via drag-and-drop. It commits `config/scyan_assets.h` into your `zmk-config` repository.
 2. **[Bruno's ZMK Config](https://github.com/BrunoWB/zmk-config)**: User configuration containing `corne.keymap`, `corne.conf`, `build.yaml`, and `config/west.yml`.
-3. **[Scyan ZMK Module](https://github.com/BrunoWB/scyan-zmk-module) (This repo)**: The runtime engine included in `west.yml` that reads `custom_display_assets.h` and handles display rendering, orientation transforms, and ZMK event orchestration.
+3. **[Scyan ZMK Module](https://github.com/BrunoWB/scyan-zmk-module) (This repo)**: The runtime engine included in `west.yml` that reads `scyan_assets.h` and handles display rendering, orientation transforms, and ZMK event orchestration.
 
 ---
 
@@ -59,13 +59,14 @@ Add these options to your `corne.conf` (or target shield config) in `zmk-config`
 | Kconfig Symbol | Type | Default | Description |
 |---|---|---|---|
 | `CONFIG_ZMK_DISPLAY_STATUS_SCREEN_CUSTOM` | bool | `y` | Enables custom status screen provided by this module |
-| `CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_90` | bool | `y` | 90° rotation (standard Corne vertical OLED orientation) |
-| `CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_270` | bool | `n` | 270° rotation (inverted vertical orientation) |
-| `CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_0` | bool | `n` | 0° rotation (standard horizontal orientation) |
-| `CONFIG_CUSTOM_STATUS_SCREEN_INVERT` | bool | `y` | Invert monochrome pixels (SSD1306 contrast optimization) |
-| `CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS` | int | `10000` | Inactivity time in ms before switching to idle screen |
-| `CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL` | bool | `y` | Map Left screen blocks to Central split role |
-| `CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME` | string | `"SCYAN"`| Fallback text for branding widgets |
+| `CONFIG_SCYAN_ROTATION_90` | bool | `y` | 90° rotation (standard Corne vertical OLED orientation) |
+| `CONFIG_SCYAN_ROTATION_270` | bool | `n` | 270° rotation (inverted vertical orientation) |
+| `CONFIG_SCYAN_ROTATION_0` | bool | `n` | 0° rotation (standard horizontal orientation) |
+| `CONFIG_SCYAN_INVERT` | bool | `y` | Invert monochrome pixels (SSD1306 contrast optimization) |
+| `CONFIG_SCYAN_IDLE_TIMEOUT_MS` | int | `10000` | Inactivity time in ms before switching to idle screen |
+| `CONFIG_SCYAN_LEFT_IS_CENTRAL` | bool | `y` | Map Left screen blocks to Central split role |
+| `CONFIG_SCYAN_USER_NAME` | string | `"SCYAN"`| Fallback text for branding widgets |
+| `CONFIG_SCYAN_BONGO_TAP_MS` | int | `60` | Bongo Cat tap animation duration in milliseconds |
 
 ---
 

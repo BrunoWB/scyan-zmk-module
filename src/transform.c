@@ -15,13 +15,13 @@ void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj) {
         for (int vx = 0; vx < DISPLAY_VIRTUAL_WIDTH; vx++) {
             int hx, hy;
 
-#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_270)
+#if IS_ENABLED(CONFIG_SCYAN_ROTATION_270)
             hx = vy;
             hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
-#elif IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_ROTATION_0)
+#elif IS_ENABLED(CONFIG_SCYAN_ROTATION_0)
             hx = vx;
             hy = vy;
-#else // Default: 90 degrees
+#else // Default: 90 degrees (CONFIG_SCYAN_ROTATION_90)
             hx = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
             hy = vx;
 #endif
@@ -32,7 +32,7 @@ void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj) {
 
             uint8_t pixel_on = vbuf[vy][vx];
 
-#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_INVERT)
+#if IS_ENABLED(CONFIG_SCYAN_INVERT)
             lv_color_t color = pixel_on ? lv_color_black() : lv_color_white();
 #else
             lv_color_t color = pixel_on ? lv_color_white() : lv_color_black();

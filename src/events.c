@@ -205,14 +205,14 @@ static int custom_activity_listener_cb(const zmk_event_t *eh) {
             bool is_left = (pos_ev->position < 21);
 #elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
             bool is_local = (pos_ev->source == ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL);
-#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL)
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
             bool is_left = is_local;
 #else
             bool is_left = !is_local;
 #endif
 #else
             // Peripheral half only receives its own local keystrokes
-#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL)
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
             bool is_left = false;
 #else
             bool is_left = true;

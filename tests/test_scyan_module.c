@@ -3,7 +3,7 @@
  */
 
 #include "mock_zmk.h"
-#include "custom_display_assets.h"
+#include "scyan_assets.h"
 
 // Include module sources directly for testing
 #include "canvas.h"
@@ -82,6 +82,7 @@ void test_utf8_and_fonts(void) {
             }
         }
     }
+    assert(has_pixel);
     int measured_w = font_measure_text(font_get_small(), "SCYAN");
     assert(measured_w == 25);
 

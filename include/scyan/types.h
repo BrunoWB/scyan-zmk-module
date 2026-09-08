@@ -11,22 +11,22 @@
 
 #include <zmk/endpoints.h>
 
-#if __has_include("custom_display_assets.h")
-#include "custom_display_assets.h"
+#if __has_include("scyan_assets.h")
+#include "scyan_assets.h"
 #else
-#error "custom_display_assets.h not found! Please export your display layout from Scyan ZMK Studio into your zmk-config directory."
+#error "scyan_assets.h not found! Please export your display layout from Scyan ZMK Studio into your zmk-config directory."
 #endif
 
 #ifndef HAS_CUSTOM_LAYOUT_BLOCKS
-#error "custom_display_assets.h must define HAS_CUSTOM_LAYOUT_BLOCKS. Please re-export your layout from Scyan ZMK Studio."
+#error "scyan_assets.h must define HAS_CUSTOM_LAYOUT_BLOCKS. Please re-export your layout from Scyan ZMK Studio."
 #endif
 
-#ifndef CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS
-#define CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS 10000
+#ifndef CONFIG_SCYAN_IDLE_TIMEOUT_MS
+#define CONFIG_SCYAN_IDLE_TIMEOUT_MS 10000
 #endif
 
-#ifndef CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME
-#define CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME "SCYAN"
+#ifndef CONFIG_SCYAN_USER_NAME
+#define CONFIG_SCYAN_USER_NAME "SCYAN"
 #endif
 
 #define CANVAS_WIDTH  DISPLAY_HW_WIDTH   // 128

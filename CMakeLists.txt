@@ -20,7 +20,7 @@ if (CONFIG_ZMK_DISPLAY_STATUS_SCREEN_CUSTOM)
   )
 
   # Prioritize user config directory BEFORE any internal search paths
-  # to guarantee custom_display_assets.h exported by Scyan ZMK Studio is loaded.
+  # to guarantee scyan_assets.h exported by Scyan ZMK Studio is loaded.
   if (DEFINED ZMK_CONFIG)
     target_include_directories(app BEFORE PRIVATE
       ${ZMK_CONFIG}

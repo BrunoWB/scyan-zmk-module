@@ -17,7 +17,7 @@ void widget_render_branding(const struct display_layout_block *b, const struct c
     } else {
         // Text mode (default)
         const char *text = (b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] :
-                           (b->custom_text ? b->custom_text : CONFIG_CUSTOM_STATUS_SCREEN_USER_NAME);
+                           (b->custom_text ? b->custom_text : CONFIG_SCYAN_USER_NAME);
 
         const struct display_font *font = font_get_small();
         int text_w = font_measure_text(font, text);

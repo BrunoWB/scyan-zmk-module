@@ -3,49 +3,49 @@ menu "Scyan ZMK Display Module"
 config LV_Z_MEM_POOL_SIZE
     default 4096 if ZMK_DISPLAY_STATUS_SCREEN_CUSTOM
 
-choice CUSTOM_STATUS_SCREEN_ROTATION
+choice SCYAN_ROTATION
     prompt "Status Screen Rotation"
-    default CUSTOM_STATUS_SCREEN_ROTATION_90
+    default SCYAN_ROTATION_90
     help
       Orientation transform angle for Corne vertical OLED displays.
 
-config CUSTOM_STATUS_SCREEN_ROTATION_90
+config SCYAN_ROTATION_90
     bool "90 degrees (standard vertical Corne mounting)"
 
-config CUSTOM_STATUS_SCREEN_ROTATION_270
+config SCYAN_ROTATION_270
     bool "270 degrees (inverted 180 degrees)"
 
-config CUSTOM_STATUS_SCREEN_ROTATION_0
+config SCYAN_ROTATION_0
     bool "0 degrees (horizontal)"
 
 endchoice
 
-config CUSTOM_STATUS_SCREEN_INVERT
+config SCYAN_INVERT
     bool "Invert display colors"
     default y
     help
       Inverts monochrome pixels (swap black and white for SSD1306 displays).
 
-config CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS
+config SCYAN_IDLE_TIMEOUT_MS
     int "Idle screen timeout in milliseconds"
     default 10000
     help
       Duration of key inactivity in milliseconds before transitioning to the idle screen layout.
 
-config CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL
+config SCYAN_LEFT_IS_CENTRAL
     bool "Map Left screen blocks to Central split role"
     default y
     help
       When enabled, the split Central half renders LAYOUT_LEFT_* blocks and Peripheral renders
       LAYOUT_RIGHT_* blocks. When disabled, Central renders LAYOUT_RIGHT_* and Peripheral renders LAYOUT_LEFT_*.
 
-config CUSTOM_STATUS_SCREEN_USER_NAME
+config SCYAN_USER_NAME
     string "Default branding user name"
     default "SCYAN"
     help
       Default text string rendered by branding widgets when no custom text is supplied.
 
-config CUSTOM_STATUS_SCREEN_BONGO_TAP_MS
+config SCYAN_BONGO_TAP_MS
     int "Bongo Cat tap duration in milliseconds"
     default 60
     help
