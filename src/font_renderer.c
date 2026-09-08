@@ -110,21 +110,26 @@ int font_measure_text(const struct display_font *font, const char *text) {
     if (!font) font = &font_default;
 
     const char *p = text;
-    int width = 0;
+    int cur_x = 0;
+    int max_x = 0;
     uint32_t cp;
 
     while ((cp = font_utf8_next_codepoint(&p)) != 0) {
         if (cp == ' ') {
-            width += font->space_advance > 0 ? font->space_advance : 3;
+            cur_x += font->space_advance > 0 ? font->space_advance : 3;
             continue;
         }
         const struct font_glyph *g = font_find_glyph(font, cp);
         if (g) {
-            width += g->advance_x;
+            int char_extent = cur_x + g->width;
+            if (char_extent > max_x) {
+                max_x = char_extent;
+            }
+            cur_x += g->advance_x;
         }
     }
 
-    return width;
+    return max_x > 0 ? max_x : cur_x;
 }
 
 const struct display_font *font_get_default(void) {

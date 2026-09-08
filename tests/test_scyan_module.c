@@ -82,8 +82,20 @@ void test_utf8_and_fonts(void) {
             }
         }
     }
-    assert(has_pixel);
-    printf("  -> UTF-8 and font rasterizer passed (measured width = %d).\n", width);
+    int measured_w = font_measure_text(font_get_small(), "SCYAN");
+    assert(measured_w == 25);
+
+    // Verify ink of 'N' exists at column 24
+    bool has_n_ink = false;
+    for (int y = 0; y < 5; y++) {
+        if (canvas_get_pixel(24, y) == 1) {
+            has_n_ink = true;
+            break;
+        }
+    }
+    assert(has_n_ink);
+
+    printf("  -> UTF-8 and font rasterizer passed (measured width = %d, ink width = %d).\n", width, measured_w);
 }
 
 void test_symbols(void) {
@@ -144,6 +156,31 @@ void test_widgets(void) {
     for (size_t i = 0; i < LAYOUT_RIGHT_IDLE_COUNT; i++) {
         widget_dispatch_block(&LAYOUT_RIGHT_IDLE_BLOCKS[i], &state);
     }
+
+    // Verify branding widget renders full text without clipping even when placed near/past margin
+    const char *test_entry = "SCYAN";
+    struct display_layout_block test_branding_block = {
+        .type = WIDGET_TYPE_BRANDING,
+        .x = 8,
+        .y = 10,
+        .width = 32,
+        .height = 5,
+        .enabled = true,
+        .mode = 1,
+        .text_count = 1,
+        .text_entries = { test_entry },
+    };
+    canvas_clear();
+    widget_dispatch_block(&test_branding_block, &state);
+    // Even though b->x was 8, clamp adjusted draw_x to 7 (32 - 25), so last pixel column of 'N' is at x = 7 + 24 = 31
+    bool n_pixel_found = false;
+    for (int y = 10; y < 15; y++) {
+        if (canvas_get_pixel(31, y) == 1) {
+            n_pixel_found = true;
+            break;
+        }
+    }
+    assert(n_pixel_found);
 
     printf("  -> Layout blocks and widgets passed successfully.\n");
 }

@@ -21,7 +21,25 @@ void widget_render_branding(const struct display_layout_block *b, const struct c
 
         const struct display_font *font = font_get_small();
         int text_w = font_measure_text(font, text);
-        int draw_x = (b->width > text_w) ? (b->x + (b->width - text_w) / 2) : b->x;
+        int draw_x;
+
+        if (b->x == 0 && b->width >= DISPLAY_VIRTUAL_WIDTH) {
+            // Full screen width centering intent
+            draw_x = (DISPLAY_VIRTUAL_WIDTH - text_w) / 2;
+        } else if (b->width > text_w && b->width < DISPLAY_VIRTUAL_WIDTH) {
+            // Centered within bounded block
+            draw_x = b->x + (b->width - text_w) / 2;
+        } else {
+            draw_x = b->x;
+        }
+
+        // Hardware display boundary safety clamp: prevent clipping of trailing characters
+        if (draw_x + text_w > DISPLAY_VIRTUAL_WIDTH) {
+            draw_x = DISPLAY_VIRTUAL_WIDTH - text_w;
+        }
+        if (draw_x < 0) {
+            draw_x = 0;
+        }
 
         font_draw_text(draw_x, b->y, font, text);
     }
