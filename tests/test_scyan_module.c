@@ -3,7 +3,11 @@
  */
 
 #include "mock_zmk.h"
+#if __has_include("scyan_assets.h")
 #include "scyan_assets.h"
+#else
+#include "scyan/scyan_assets.install.h"
+#endif
 
 // Include module sources directly for testing
 #include "canvas.h"

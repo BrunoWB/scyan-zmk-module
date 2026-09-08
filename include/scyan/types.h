@@ -13,6 +13,10 @@
 
 #if __has_include("scyan_assets.h")
 #include "scyan_assets.h"
+#elif __has_include("scyan/scyan_assets.install.h")
+#include "scyan/scyan_assets.install.h"
+#elif __has_include("scyan_assets.install.h")
+#include "scyan_assets.install.h"
 #else
 #error "scyan_assets.h not found! Please export your display layout from Scyan ZMK Studio into your zmk-config directory."
 #endif
