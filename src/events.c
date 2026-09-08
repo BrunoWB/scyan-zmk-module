@@ -51,6 +51,39 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include "events.h"
 #include "engine.h"
 
+#define LOCAL_WPM_WINDOW_MS 3500
+#define LOCAL_WPM_MAX_KEYSTROKES 16
+
+static uint32_t local_keystroke_times[LOCAL_WPM_MAX_KEYSTROKES];
+static uint8_t local_keystroke_head = 0;
+static uint8_t local_keystroke_count = 0;
+
+void events_record_keystroke(void) {
+    uint32_t now = k_uptime_get_32();
+    local_keystroke_times[local_keystroke_head] = now;
+    local_keystroke_head = (local_keystroke_head + 1) % LOCAL_WPM_MAX_KEYSTROKES;
+    if (local_keystroke_count < LOCAL_WPM_MAX_KEYSTROKES) {
+        local_keystroke_count++;
+    }
+}
+
+uint8_t events_get_local_wpm(void) {
+    uint32_t now = k_uptime_get_32();
+    uint8_t valid = 0;
+    for (uint8_t i = 0; i < local_keystroke_count; i++) {
+        uint8_t idx = (local_keystroke_head + LOCAL_WPM_MAX_KEYSTROKES - 1 - i) % LOCAL_WPM_MAX_KEYSTROKES;
+        if (now - local_keystroke_times[idx] <= LOCAL_WPM_WINDOW_MS) {
+            valid++;
+        }
+    }
+    if (valid < 2) return 0;
+    // On split peripheral, local half receives ~half of typing strokes.
+    // 5 keystrokes = 1 word. Speed = (valid * 2 / 5) * (60000 / LOCAL_WPM_WINDOW_MS)
+    uint32_t wpm = (valid * 2 * 60000) / (5 * LOCAL_WPM_WINDOW_MS);
+    if (wpm > 200) wpm = 200;
+    return (uint8_t)wpm;
+}
+
 static struct custom_status_state events_get_current_state(const zmk_event_t *eh) {
     struct custom_status_state s;
     memset(&s, 0, sizeof(s));
@@ -82,6 +115,8 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
     // WPM status
 #if IS_ENABLED(CONFIG_ZMK_WPM)
     s.wpm = zmk_wpm_get_state();
+#else
+    s.wpm = events_get_local_wpm();
 #endif
 
     // Split peripheral status (for central)
@@ -111,6 +146,7 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
 #else
     s.split_connected = false;
 #endif
+    s.wpm = events_get_local_wpm();
 #endif
 
     // Activity check: layer change resets idle timeout
@@ -163,6 +199,7 @@ static int custom_activity_listener_cb(const zmk_event_t *eh) {
     if (pos_ev != NULL) {
         engine_notify_activity();
         if (pos_ev->state) {
+            events_record_keystroke();
             // Determine whether the key is from Left or Right side
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT)
             bool is_left = (pos_ev->position < 21);

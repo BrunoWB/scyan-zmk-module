@@ -71,10 +71,20 @@ void widget_render_wpm_chart(const struct display_layout_block *b, const struct 
 
     int grid_size = b->param1;
     int target = b->param2 > 0 ? b->param2 : 100;
+    int time_window = b->param3 > 0 ? b->param3 : 30;
     int chart_w = b->width > 0 ? b->width : 32;
     int chart_h = b->height > 0 ? b->height : 24;
     int bx = b->x;
     int by = b->y;
+
+    // Clamp dimensions to display bounds so borders and NOW column stay on-screen
+    if (bx + chart_w > DISPLAY_VIRTUAL_WIDTH) {
+        chart_w = DISPLAY_VIRTUAL_WIDTH - bx;
+    }
+    if (by + chart_h > DISPLAY_VIRTUAL_HEIGHT) {
+        chart_h = DISPLAY_VIRTUAL_HEIGHT - by;
+    }
+    if (chart_w <= 2 || chart_h <= 2) return;
 
     // Render outer border & grid points if grid_size > 0
     if (grid_size > 0) {
@@ -103,19 +113,23 @@ void widget_render_wpm_chart(const struct display_layout_block *b, const struct 
 
     // Oscilloscope / heartbeat line:
     // Rightmost column (inner_x + inner_w - 1) is NOW (current state->wpm).
-    // Older samples scroll left from rightmost column.
+    // Older samples scroll left from rightmost column scaled across time_window.
     // Top = targetSpeed, Bottom = 0 WPM.
     int prev_py = -1;
     for (int c = 0; c < inner_w; c++) {
         int px = inner_x + c;
-        int age = inner_w - 1 - c;
         uint8_t val;
-        if (age == 0) {
+        if (c == inner_w - 1) {
             val = state->wpm;
-        } else if (age <= wpm_history_count && (WPM_HISTORY_MAX - age) >= 0) {
-            val = wpm_history[WPM_HISTORY_MAX - age];
         } else {
-            val = 0;
+            int age_sec = (inner_w > 1) ? ((inner_w - 1 - c) * time_window) / (inner_w - 1) : 0;
+            if (age_sec == 0) {
+                val = state->wpm;
+            } else if (age_sec <= wpm_history_count && (WPM_HISTORY_MAX - age_sec) >= 0) {
+                val = wpm_history[WPM_HISTORY_MAX - age_sec];
+            } else {
+                val = 0;
+            }
         }
 
         int clamped_val = val > target ? target : val;

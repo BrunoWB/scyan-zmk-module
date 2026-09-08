@@ -377,6 +377,18 @@ void test_wpm_chart_widget(void) {
     assert(canvas_get_pixel(15, 19) == 1);
     assert(canvas_get_pixel(31, 19) == 1);
 
+    // Test boundary clamping when width exceeds DISPLAY_VIRTUAL_WIDTH (e.g. 36px on 32px screen)
+    chart_block.param1 = 4;
+    chart_block.width = 36;
+    state.wpm = 100;
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+    // Right border must be clamped to x = 31 (not offscreen at 35)
+    assert(canvas_get_pixel(31, 0) == 1);
+    assert(canvas_get_pixel(31, 19) == 1);
+    // Rightmost inner column is x = 30 and peak is at top (y = 1)
+    assert(canvas_get_pixel(30, 1) == 1);
+
     printf("  -> WPM chart widget passed successfully.\n");
 }
 

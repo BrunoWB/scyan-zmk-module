@@ -46,3 +46,11 @@ struct zmk_endpoint_instance {
 #define CONFIG_ZMK_SPLIT 1
 #define CONFIG_ZMK_SPLIT_ROLE_CENTRAL 1
 
+static uint32_t mock_uptime_ms = 100000;
+static inline uint32_t k_uptime_get_32(void) {
+    return mock_uptime_ms;
+}
+static inline void mock_set_uptime(uint32_t ms) {
+    mock_uptime_ms = ms;
+}
+
