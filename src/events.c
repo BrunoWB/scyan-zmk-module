@@ -56,7 +56,8 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
     memset(&s, 0, sizeof(s));
 
     // Battery status
-    s.battery_level = zmk_battery_state_of_charge();
+    const struct zmk_battery_state_changed *batt_ev = as_zmk_battery_state_changed(eh);
+    s.battery_level = (batt_ev != NULL) ? batt_ev->state_of_charge : zmk_battery_state_of_charge();
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
     s.charging = zmk_usb_is_powered();
 #endif

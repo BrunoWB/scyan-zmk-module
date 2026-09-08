@@ -36,10 +36,9 @@ void widget_render_battery(const struct display_layout_block *b, const struct cu
     } else {
         // Symbol / Icon mode
         if (b->symbol_count > 0) {
-            int steps = (b->param1 > 1) ? b->param1 : b->symbol_count;
-            if (steps > b->symbol_count) steps = b->symbol_count;
+            int steps = b->symbol_count;
 
-            int idx = ((int)level * (steps - 1)) / 100;
+            int idx = ((int)level * steps) / 100;
             if (idx >= steps) idx = steps - 1;
             if (idx < 0) idx = 0;
 

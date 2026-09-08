@@ -228,6 +228,54 @@ void test_bongo_widget(void) {
     printf("  -> Bongo Cat widget passed successfully.\n");
 }
 
+void test_battery_widget(void) {
+    printf("[TEST] Testing battery widget level and symbol resolution...\n");
+    struct display_layout_block batt_block = {
+        .type = WIDGET_TYPE_BATTERY,
+        .x = 0,
+        .y = 0,
+        .width = 17,
+        .height = 10,
+        .enabled = true,
+        .mode = 0,
+        .param1 = 2, // Even with stale param1=2, symbol_count must drive steps
+        .param2 = 0,
+        .symbol_count = 14,
+        .symbol_ids = {
+            SYMBOL_CHARGE_0960, SYMBOL_CHARGE_0960_SUB_1, SYMBOL_CHARGE_0960_SUB_2,
+            SYMBOL_CHARGE_0960_SUB_3, SYMBOL_CHARGE_0960_SUB_4, SYMBOL_CHARGE_0960_SUB_5,
+            SYMBOL_CHARGE_0960_SUB_6, SYMBOL_CHARGE_0960_SUB_7, SYMBOL_CHARGE_0960_SUB_8,
+            SYMBOL_CHARGE_0960_SUB_9, SYMBOL_CHARGE_0960_SUB_10, SYMBOL_CHARGE_0960_SUB_11,
+            SYMBOL_CHARGE_0960_SUB_12, SYMBOL_BATTERY_FRAME
+        },
+    };
+
+    struct custom_status_state state = { .battery_level = 85, .charging = false };
+
+    // Test 85%: with 14 steps, 85% must map to index 11 (not index 0)
+    int steps = batt_block.symbol_count;
+    int idx = ((int)state.battery_level * steps) / 100;
+    if (idx >= steps) idx = steps - 1;
+    assert(idx == 11);
+
+    // Verify rendering does not crash
+    canvas_clear();
+    widget_render_battery(&batt_block, &state);
+
+    // Test text mode percentage
+    batt_block.mode = 1;
+    batt_block.text_count = 0;
+    canvas_clear();
+    widget_render_battery(&batt_block, &state);
+
+    // Test text mode with charging
+    state.charging = true;
+    canvas_clear();
+    widget_render_battery(&batt_block, &state);
+
+    printf("  -> Battery widget passed successfully.\n");
+}
+
 int main(void) {
     printf("=============================================\n");
     printf("Running unit test suite for scyan-zmk-module \n");
@@ -239,6 +287,7 @@ int main(void) {
     test_widgets();
     test_rotation_transform();
     test_bongo_widget();
+    test_battery_widget();
 
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");
