@@ -120,6 +120,7 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
 #endif
 
     s.is_idle = engine_is_idle();
+    s.bongo_state = engine_get_bongo_state();
     return s;
 }
 
@@ -154,10 +155,32 @@ ZMK_SUBSCRIPTION(scyan_status_listener, zmk_wpm_state_changed);
 #endif
 #endif
 
-/* Dedicated lightweight listener for idle wakeup; avoids triggering full display redraws during typing */
+/* Dedicated lightweight listener for idle wakeup and responsive bongo taps */
 static int custom_activity_listener_cb(const zmk_event_t *eh) {
-    if (as_zmk_position_state_changed(eh) != NULL) {
+    const struct zmk_position_state_changed *pos_ev = as_zmk_position_state_changed(eh);
+    if (pos_ev != NULL) {
         engine_notify_activity();
+        if (pos_ev->state) {
+            // Determine whether the key is from Left or Right side
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT)
+            bool is_left = (pos_ev->position < 21);
+#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+            bool is_local = (pos_ev->source == ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL);
+#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL)
+            bool is_left = is_local;
+#else
+            bool is_left = !is_local;
+#endif
+#else
+            // Peripheral half only receives its own local keystrokes
+#if IS_ENABLED(CONFIG_CUSTOM_STATUS_SCREEN_LEFT_IS_CENTRAL)
+            bool is_left = false;
+#else
+            bool is_left = true;
+#endif
+#endif
+            engine_bongo_tap(is_left);
+        }
     }
     return ZMK_EV_EVENT_BUBBLE;
 }

@@ -15,4 +15,6 @@ void engine_trigger_refresh(void);
 void engine_notify_activity(void);
 bool engine_is_idle(void);
 void engine_set_idle(bool idle);
+void engine_bongo_tap(bool is_left);
+uint8_t engine_get_bongo_state(void);
 

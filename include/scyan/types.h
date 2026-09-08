@@ -48,5 +48,10 @@ struct custom_status_state {
     bool split_connected;
     bool caps_lock;
     bool is_idle;
+    uint8_t bongo_state; // 0: idle/neutral, 1: tap left, 2: tap right
 };
+
+#ifndef WIDGET_TYPE_BONGO
+#define WIDGET_TYPE_BONGO 10
+#endif
 

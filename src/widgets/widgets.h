@@ -16,6 +16,7 @@ void widget_render_branding(const struct display_layout_block *b, const struct c
 void widget_render_split(const struct display_layout_block *b, const struct custom_status_state *state);
 void widget_render_screensaver(const struct display_layout_block *b, const struct custom_status_state *state);
 void widget_render_caps(const struct display_layout_block *b, const struct custom_status_state *state);
+void widget_render_bongo(const struct display_layout_block *b, const struct custom_status_state *state);
 
 void widget_dispatch_block(const struct display_layout_block *b, const struct custom_status_state *state);
 

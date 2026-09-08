@@ -58,6 +58,9 @@ void widget_dispatch_block(const struct display_layout_block *b, const struct cu
     case WIDGET_TYPE_CAPS_LOCK:
         widget_render_caps(b, state);
         break;
+    case WIDGET_TYPE_BONGO:
+        widget_render_bongo(b, state);
+        break;
     default:
         break;
     }

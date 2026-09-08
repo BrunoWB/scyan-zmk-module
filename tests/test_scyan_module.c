@@ -19,6 +19,7 @@
 #include "widgets/widget_split.c"
 #include "widgets/widget_screensaver.c"
 #include "widgets/widget_caps.c"
+#include "widgets/widget_bongo.c"
 
 // Test runner functions
 
@@ -157,6 +158,76 @@ void test_rotation_transform(void) {
     printf("  -> Rotation transformation passed.\n");
 }
 
+void test_bongo_widget(void) {
+    printf("[TEST] Testing reactive Bongo Cat widget...\n");
+    struct custom_status_state state = {
+        .bongo_state = 0,
+    };
+
+    struct display_layout_block bongo_block = {
+        .type = WIDGET_TYPE_BONGO,
+        .x = 0,
+        .y = 0,
+        .width = 32,
+        .height = 23,
+        .enabled = true,
+        .mode = 0,
+        .symbol_count = 3,
+        .symbol_ids = { SYMBOL_USB, SYMBOL_SPLIT_CONNECTED, SYMBOL_SPLIT_DISCONNECTED },
+    };
+
+    // State 0: neutral
+    canvas_clear();
+    widget_dispatch_block(&bongo_block, &state);
+    bool has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // State 1: left tap
+    state.bongo_state = 1;
+    canvas_clear();
+    widget_dispatch_block(&bongo_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // State 2: right tap
+    state.bongo_state = 2;
+    canvas_clear();
+    widget_dispatch_block(&bongo_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // Text fallback mode
+    bongo_block.mode = 1;
+    bongo_block.text_count = 1;
+    bongo_block.text_entries[0] = "BONGO";
+    canvas_clear();
+    widget_dispatch_block(&bongo_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    printf("  -> Bongo Cat widget passed successfully.\n");
+}
+
 int main(void) {
     printf("=============================================\n");
     printf("Running unit test suite for scyan-zmk-module \n");
@@ -167,6 +238,7 @@ int main(void) {
     test_symbols();
     test_widgets();
     test_rotation_transform();
+    test_bongo_widget();
 
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");

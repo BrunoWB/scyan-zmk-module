@@ -32,6 +32,7 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
     if (a->split_connected != b->split_connected) return false;
     if (a->caps_lock != b->caps_lock) return false;
     if (a->is_idle != b->is_idle) return false;
+    if (a->bongo_state != b->bongo_state) return false;
     return true;
 }
 
@@ -95,6 +96,26 @@ static void idle_work_cb(struct k_work *work) {
     }
 }
 
+static uint8_t current_bongo_state = 0;
+static struct k_work_delayable bongo_idle_work;
+
+static void bongo_idle_work_cb(struct k_work *work) {
+    if (current_bongo_state != 0) {
+        current_bongo_state = 0;
+        engine_trigger_refresh();
+    }
+}
+
+void engine_bongo_tap(bool is_left) {
+    current_bongo_state = is_left ? 1 : 2;
+    engine_trigger_refresh();
+    k_work_reschedule(&bongo_idle_work, K_MSEC(120));
+}
+
+uint8_t engine_get_bongo_state(void) {
+    return current_bongo_state;
+}
+
 void engine_notify_activity(void) {
     if (is_screen_idle) {
         is_screen_idle = false;
@@ -115,8 +136,11 @@ void engine_init(lv_obj_t *canvas_obj) {
     engine_canvas_obj = canvas_obj;
     state_has_rendered = false;
     is_screen_idle = false;
+    current_bongo_state = 0;
 
     k_work_init_delayable(&idle_work, idle_work_cb);
     k_work_schedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
+
+    k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
 }
 
