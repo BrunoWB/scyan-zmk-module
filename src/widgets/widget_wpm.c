@@ -4,32 +4,34 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "widgets.h"
 #include "canvas.h"
 #include "font_renderer.h"
 
-#define WPM_HISTORY_MAX 32
+#define WPM_HISTORY_MAX 64
 
 static uint8_t wpm_history[WPM_HISTORY_MAX];
-static uint8_t wpm_history_idx = 0;
 static uint8_t wpm_history_count = 0;
-static uint8_t last_recorded_wpm = 0xFF;
 
-static void record_wpm_sample(uint8_t wpm) {
-    if (wpm == last_recorded_wpm && wpm_history_count > 0) return;
-    last_recorded_wpm = wpm;
-
-    wpm_history[wpm_history_idx] = wpm;
-    wpm_history_idx = (wpm_history_idx + 1) % WPM_HISTORY_MAX;
+void widget_wpm_tick(uint8_t current_wpm) {
+    for (int i = 0; i < WPM_HISTORY_MAX - 1; i++) {
+        wpm_history[i] = wpm_history[i + 1];
+    }
+    wpm_history[WPM_HISTORY_MAX - 1] = current_wpm;
     if (wpm_history_count < WPM_HISTORY_MAX) {
         wpm_history_count++;
     }
 }
 
+void widget_wpm_reset_history(void) {
+    memset(wpm_history, 0, sizeof(wpm_history));
+    wpm_history_count = 0;
+}
+
 void widget_render_wpm(const struct display_layout_block *b, const struct custom_status_state *state) {
     if (!b || !b->enabled) return;
 
-    record_wpm_sample(state->wpm);
     int target = b->param2 > 0 ? b->param2 : 100;
 
     if (b->mode == 1) {
@@ -67,29 +69,67 @@ void widget_render_wpm(const struct display_layout_block *b, const struct custom
 void widget_render_wpm_chart(const struct display_layout_block *b, const struct custom_status_state *state) {
     if (!b || !b->enabled) return;
 
-    record_wpm_sample(state->wpm);
-
+    int grid_size = b->param1;
     int target = b->param2 > 0 ? b->param2 : 100;
-    int chart_w = b->width > 0 ? b->width : 28;
-    int chart_h = b->height > 0 ? b->height : 16;
+    int chart_w = b->width > 0 ? b->width : 32;
+    int chart_h = b->height > 0 ? b->height : 24;
     int bx = b->x;
     int by = b->y;
 
-    // Draw baseline
-    canvas_fill_rect(bx, by + chart_h - 1, chart_w, 1, 1);
+    // Render outer border & grid points if grid_size > 0
+    if (grid_size > 0) {
+        canvas_fill_rect(bx, by, chart_w, 1, 1);
+        canvas_fill_rect(bx, by + chart_h - 1, chart_w, 1, 1);
+        canvas_fill_rect(bx, by, 1, chart_h, 1);
+        canvas_fill_rect(bx + chart_w - 1, by, 1, chart_h, 1);
 
-    // Plot historical points from right to left
-    int points = wpm_history_count < chart_w ? wpm_history_count : chart_w;
-    for (int i = 0; i < points; i++) {
-        int hist_pos = (wpm_history_idx - 1 - i + WPM_HISTORY_MAX) % WPM_HISTORY_MAX;
-        uint8_t val = wpm_history[hist_pos];
+        for (int y = grid_size; y < chart_h - 1; y += grid_size) {
+            for (int x = grid_size; x < chart_w - 1; x += grid_size) {
+                canvas_set_pixel(bx + x, by + y, 1);
+            }
+        }
+    }
 
-        int bar_h = ((int)val * (chart_h - 2)) / target;
-        if (bar_h > (chart_h - 2)) bar_h = chart_h - 2;
-        if (bar_h < 1 && val > 0) bar_h = 1;
+    int inner_x = bx + (grid_size > 0 ? 1 : 0);
+    int inner_y = by + (grid_size > 0 ? 1 : 0);
+    int inner_w = chart_w - (grid_size > 0 ? 2 : 0);
+    int inner_h = chart_h - (grid_size > 0 ? 2 : 0);
+    if (inner_w <= 1 || inner_h <= 1) return;
 
-        int px = bx + chart_w - 1 - i;
-        int py = by + chart_h - 1 - bar_h;
-        canvas_fill_rect(px, py, 1, bar_h, 1);
+    // Draw baseline if no grid/border
+    if (grid_size == 0) {
+        canvas_fill_rect(inner_x, inner_y + inner_h - 1, inner_w, 1, 1);
+    }
+
+    // Oscilloscope / heartbeat line:
+    // Rightmost column (inner_x + inner_w - 1) is NOW (current state->wpm).
+    // Older samples scroll left from rightmost column.
+    // Top = targetSpeed, Bottom = 0 WPM.
+    int prev_py = -1;
+    for (int c = 0; c < inner_w; c++) {
+        int px = inner_x + c;
+        int age = inner_w - 1 - c;
+        uint8_t val;
+        if (age == 0) {
+            val = state->wpm;
+        } else if (age <= wpm_history_count && (WPM_HISTORY_MAX - age) >= 0) {
+            val = wpm_history[WPM_HISTORY_MAX - age];
+        } else {
+            val = 0;
+        }
+
+        int clamped_val = val > target ? target : val;
+        int py = (inner_y + inner_h - 1) - ((clamped_val * (inner_h - 1)) / target);
+
+        if (c > 0 && prev_py >= 0) {
+            int min_y = prev_py < py ? prev_py : py;
+            int max_y = prev_py > py ? prev_py : py;
+            for (int y = min_y; y <= max_y; y++) {
+                canvas_set_pixel(px, y, 1);
+            }
+        } else {
+            canvas_set_pixel(px, py, 1);
+        }
+        prev_py = py;
     }
 }

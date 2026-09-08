@@ -4,6 +4,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include "canvas.h"
 
 static uint8_t vbuf[DISPLAY_VIRTUAL_HEIGHT][DISPLAY_VIRTUAL_WIDTH];
@@ -35,6 +36,22 @@ void canvas_fill_rect(int x, int y, int w, int h, uint8_t val) {
         for (int c = x0; c < x1; c++) {
             vbuf[r][c] = val ? 1 : 0;
         }
+    }
+}
+
+void canvas_draw_line(int x0, int y0, int x1, int y1, uint8_t val) {
+    int dx = abs(x1 - x0);
+    int sx = x0 < x1 ? 1 : -1;
+    int dy = -abs(y1 - y0);
+    int sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    while (1) {
+        canvas_set_pixel(x0, y0, val);
+        if (x0 == x1 && y0 == y1) break;
+        int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
     }
 }
 

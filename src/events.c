@@ -122,6 +122,7 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
 
     s.is_idle = engine_is_idle();
     s.bongo_state = engine_get_bongo_state();
+    s.wpm_tick = engine_get_wpm_tick();
     return s;
 }
 

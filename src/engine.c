@@ -33,6 +33,7 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
     if (a->caps_lock != b->caps_lock) return false;
     if (a->is_idle != b->is_idle) return false;
     if (a->bongo_state != b->bongo_state) return false;
+    if (a->wpm_tick != b->wpm_tick) return false;
     return true;
 }
 
@@ -106,6 +107,22 @@ static void bongo_idle_work_cb(struct k_work *work) {
     }
 }
 
+static uint8_t wpm_ticker_state = 0;
+static struct k_work_delayable wpm_ticker_work;
+
+static void wpm_ticker_work_cb(struct k_work *work) {
+    if (!is_screen_idle) {
+        wpm_ticker_state++;
+        widget_wpm_tick(last_rendered_state.wpm);
+        engine_trigger_refresh();
+        k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
+    }
+}
+
+uint8_t engine_get_wpm_tick(void) {
+    return wpm_ticker_state;
+}
+
 void engine_bongo_tap(bool is_left) {
     current_bongo_state = is_left ? 1 : 2;
     engine_trigger_refresh();
@@ -120,6 +137,7 @@ void engine_notify_activity(void) {
     if (is_screen_idle) {
         is_screen_idle = false;
         engine_trigger_refresh();
+        k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
     }
     k_work_reschedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
 }
@@ -137,10 +155,13 @@ void engine_init(lv_obj_t *canvas_obj) {
     state_has_rendered = false;
     is_screen_idle = false;
     current_bongo_state = 0;
+    wpm_ticker_state = 0;
 
     k_work_init_delayable(&idle_work, idle_work_cb);
     k_work_schedule(&idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_IDLE_TIMEOUT_MS));
 
     k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
+    k_work_init_delayable(&wpm_ticker_work, wpm_ticker_work_cb);
+    k_work_schedule(&wpm_ticker_work, K_MSEC(1000));
 }
 

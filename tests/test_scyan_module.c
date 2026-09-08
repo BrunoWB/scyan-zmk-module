@@ -44,6 +44,13 @@ void test_canvas_primitives(void) {
     }
     assert(canvas_get_pixel(4, 5) == 0);
     assert(canvas_get_pixel(15, 5) == 0);
+
+    // Test Bresenham line drawing
+    canvas_clear();
+    canvas_draw_line(0, 0, 10, 10, 1);
+    for (int i = 0; i <= 10; i++) {
+        assert(canvas_get_pixel(i, i) == 1);
+    }
     printf("  -> Canvas primitives passed.\n");
 }
 
@@ -276,6 +283,66 @@ void test_battery_widget(void) {
     printf("  -> Battery widget passed successfully.\n");
 }
 
+void test_wpm_chart_widget(void) {
+    printf("[TEST] Testing WPM chart oscilloscope/heartbeat widget...\n");
+    widget_wpm_reset_history();
+
+    struct display_layout_block chart_block = {
+        .type = WIDGET_TYPE_WPM_CHART,
+        .x = 0,
+        .y = 0,
+        .width = 32,
+        .height = 20,
+        .enabled = true,
+        .mode = 0,
+        .param1 = 4,   // gridSize: 4
+        .param2 = 100, // targetSpeed: 100
+        .param3 = 30,  // timeWindow: 30s
+    };
+
+    struct custom_status_state state = { .wpm = 100 };
+
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+
+    // Border checks with param1 = 4
+    assert(canvas_get_pixel(0, 0) == 1);
+    assert(canvas_get_pixel(31, 0) == 1);
+    assert(canvas_get_pixel(0, 19) == 1);
+    assert(canvas_get_pixel(31, 19) == 1);
+
+    // Rightmost inner column is x = 30 (width 32 - 1 border - 1).
+    // With targetSpeed = 100 and wpm = 100, the peak should be at top inner row (y = 1).
+    assert(canvas_get_pixel(30, 1) == 1);
+
+    // Now test with wpm = 0
+    state.wpm = 0;
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+    // Rightmost inner column (x = 30) should now be at bottom inner row (y = 18).
+    assert(canvas_get_pixel(30, 18) == 1);
+
+    // Test time ticking: advance history with wpm = 80
+    widget_wpm_tick(80);
+    // Now age 1 (x = 29) was recorded as 80.
+    // At wpm = 80 and target = 100, inner_h = 18, so py = 18 - (80 * 17) / 100 = 18 - 13 = 5 (y = 1 + 4 = 5).
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+    // x = 29 should have pixel turned on near y = 5 (within 1px due to integer scaling)
+    assert(canvas_get_pixel(29, 4) == 1 || canvas_get_pixel(29, 5) == 1 || canvas_get_pixel(29, 6) == 1);
+
+    // Test no-grid mode (gridSize = 0)
+    chart_block.param1 = 0;
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+    // In no-grid mode, baseline at bottom row (y = 19) is drawn
+    assert(canvas_get_pixel(0, 19) == 1);
+    assert(canvas_get_pixel(15, 19) == 1);
+    assert(canvas_get_pixel(31, 19) == 1);
+
+    printf("  -> WPM chart widget passed successfully.\n");
+}
+
 int main(void) {
     printf("=============================================\n");
     printf("Running unit test suite for scyan-zmk-module \n");
@@ -288,6 +355,7 @@ int main(void) {
     test_rotation_transform();
     test_bongo_widget();
     test_battery_widget();
+    test_wpm_chart_widget();
 
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");
