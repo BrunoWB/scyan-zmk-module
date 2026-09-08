@@ -51,7 +51,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include "events.h"
 #include "engine.h"
 
-struct custom_status_state events_get_current_state(const zmk_event_t *eh) {
+static struct custom_status_state events_get_current_state(const zmk_event_t *eh) {
     struct custom_status_state s;
     memset(&s, 0, sizeof(s));
 

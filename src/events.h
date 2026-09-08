@@ -8,5 +8,4 @@
 #include "scyan/types.h"
 
 void events_init(void);
-struct custom_status_state events_get_current_state(const zmk_event_t *eh);
 

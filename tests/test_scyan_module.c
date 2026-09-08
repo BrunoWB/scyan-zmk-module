@@ -3,7 +3,7 @@
  */
 
 #include "mock_zmk.h"
-#include "/home/Scyan/Projects/Firmware/zmk-config/config/custom_display_assets.h"
+#include "custom_display_assets.h"
 
 // Include module sources directly for testing
 #include "canvas.h"
@@ -20,14 +20,7 @@
 #include "widgets/widget_screensaver.c"
 #include "widgets/widget_caps.c"
 
-// Capture hardware buffer for transform testing
-static uint8_t hw_canvas[DISPLAY_HW_HEIGHT][DISPLAY_HW_WIDTH];
-
-void mock_set_px(int x, int y, uint8_t color) {
-    if (x >= 0 && x < DISPLAY_HW_WIDTH && y >= 0 && y < DISPLAY_HW_HEIGHT) {
-        hw_canvas[y][x] = color;
-    }
-}
+// Test runner functions
 
 void test_canvas_primitives(void) {
     printf("[TEST] Testing canvas primitives...\n");
