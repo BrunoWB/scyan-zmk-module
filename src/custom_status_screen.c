@@ -713,6 +713,9 @@ ZMK_SUBSCRIPTION(widget_custom_status, zmk_battery_state_changed);
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
 ZMK_SUBSCRIPTION(widget_custom_status, zmk_usb_conn_state_changed);
 #endif
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+ZMK_SUBSCRIPTION(widget_custom_status, zmk_split_peripheral_status_changed);
+#endif
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 ZMK_SUBSCRIPTION(widget_custom_status, zmk_endpoint_changed);
 #if IS_ENABLED(CONFIG_ZMK_BLE)
@@ -721,9 +724,6 @@ ZMK_SUBSCRIPTION(widget_custom_status, zmk_ble_active_profile_changed);
 ZMK_SUBSCRIPTION(widget_custom_status, zmk_layer_state_changed);
 #if IS_ENABLED(CONFIG_ZMK_WPM)
 ZMK_SUBSCRIPTION(widget_custom_status, zmk_wpm_state_changed);
-#endif
-#if IS_ENABLED(CONFIG_ZMK_SPLIT)
-ZMK_SUBSCRIPTION(widget_custom_status, zmk_split_peripheral_status_changed);
 #endif
 #endif
 
