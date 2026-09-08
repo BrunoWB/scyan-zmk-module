@@ -31,7 +31,7 @@ Persistent architectural reference for Antigravity pair programming in `scyan-zm
 ```
 
 * **Detailed Architecture Reference**: [`/home/Scyan/Projects/Web/scyan-zmk-studio/docs/ARCHITECTURE.md`](file:///home/Scyan/Projects/Web/scyan-zmk-studio/docs/ARCHITECTURE.md)
-* **Hardware & Driver References**: [`/home/Scyan/Projects/References/zmk/`](file:///home/Scyan/Projects/References/zmk/)
+* **Hardware & Driver References**: [`/home/Scyan/Projects/References/zmk/`](file:///home/Scyan/Projects/References/zmk/) (offline ZMK docs in `zmk-doc/` — no web fetch needed)
 
 ---
 
