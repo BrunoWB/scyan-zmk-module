@@ -45,5 +45,11 @@ config CUSTOM_STATUS_SCREEN_USER_NAME
     help
       Default text string rendered by branding widgets when no custom text is supplied.
 
+config CUSTOM_STATUS_SCREEN_BONGO_TAP_MS
+    int "Bongo Cat tap duration in milliseconds"
+    default 60
+    help
+      Duration in milliseconds that Bongo Cat holds a paw down before returning to neutral.
+
 endmenu
 

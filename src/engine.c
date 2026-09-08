@@ -123,10 +123,14 @@ uint8_t engine_get_wpm_tick(void) {
     return wpm_ticker_state;
 }
 
+#ifndef CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS
+#define CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS 60
+#endif
+
 void engine_bongo_tap(bool is_left) {
     current_bongo_state = is_left ? 1 : 2;
     engine_trigger_refresh();
-    k_work_reschedule(&bongo_idle_work, K_MSEC(120));
+    k_work_reschedule(&bongo_idle_work, K_MSEC(CONFIG_CUSTOM_STATUS_SCREEN_BONGO_TAP_MS));
 }
 
 uint8_t engine_get_bongo_state(void) {
