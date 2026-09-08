@@ -50,16 +50,11 @@ void widget_render_wpm(const struct display_layout_block *b, const struct custom
         // Symbol / Icon mode
         if (b->symbol_count > 0) {
             // Speedometer gauge slice
-            int idx = ((int)state->wpm * (b->symbol_count - 1)) / target;
+            int idx = ((int)state->wpm * b->symbol_count) / target;
             if (idx >= b->symbol_count) idx = b->symbol_count - 1;
             if (idx < 0) idx = 0;
 
-            canvas_draw_symbol(b->x, b->y + 10, b->symbol_ids[idx]);
-
-            // Numerical WPM above or alongside
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%d", state->wpm);
-            font_draw_text(b->x, b->y, font_get_digits(), buf);
+            canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
         } else {
             // Text readout fallback
             char buf[8];
