@@ -61,6 +61,9 @@ void widget_dispatch_block(const struct display_layout_block *b, const struct cu
     case WIDGET_TYPE_BONGO:
         widget_render_bongo(b, state);
         break;
+    case WIDGET_TYPE_LOOP:
+        widget_render_loop(b, state);
+        break;
     default:
         break;
     }

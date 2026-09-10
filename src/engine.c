@@ -34,6 +34,7 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
     if (a->is_idle != b->is_idle) return false;
     if (a->bongo_state != b->bongo_state) return false;
     if (a->wpm_tick != b->wpm_tick) return false;
+    if (a->loop_tick != b->loop_tick) return false;
     return true;
 }
 
@@ -90,10 +91,62 @@ void engine_update_state(struct custom_status_state state) {
     engine_render(&state);
 }
 
+static uint16_t engine_get_active_loop_speed(bool is_idle) {
+    bool is_central;
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
+    is_central = (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+#else
+    is_central = (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+#endif
+
+    const struct display_layout_block *blocks;
+    size_t count;
+    if (is_central) {
+        blocks = is_idle ? LAYOUT_LEFT_IDLE_BLOCKS : LAYOUT_LEFT_ACTIVE_BLOCKS;
+        count = is_idle ? LAYOUT_LEFT_IDLE_COUNT : LAYOUT_LEFT_ACTIVE_COUNT;
+    } else {
+        blocks = is_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
+        count = is_idle ? LAYOUT_RIGHT_IDLE_COUNT : LAYOUT_RIGHT_ACTIVE_COUNT;
+    }
+
+    uint16_t min_speed = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (blocks[i].enabled && blocks[i].type == WIDGET_TYPE_LOOP) {
+            uint16_t speed = (blocks[i].param1 > 0) ? (uint16_t)blocks[i].param1 : 250;
+            if (min_speed == 0 || speed < min_speed) {
+                min_speed = speed;
+            }
+        }
+    }
+    return min_speed;
+}
+
+static uint8_t loop_ticker_state = 0;
+static struct k_work_delayable loop_ticker_work;
+
+static void loop_ticker_work_cb(struct k_work *work) {
+    uint16_t speed = engine_get_active_loop_speed(is_screen_idle);
+    if (speed > 0) {
+        loop_ticker_state++;
+        engine_trigger_refresh();
+        k_work_reschedule(&loop_ticker_work, K_MSEC(speed));
+    }
+}
+
+uint8_t engine_get_loop_tick(void) {
+    return loop_ticker_state;
+}
+
 static void idle_work_cb(struct k_work *work) {
     if (!is_screen_idle) {
         is_screen_idle = true;
         engine_trigger_refresh();
+        uint16_t idle_speed = engine_get_active_loop_speed(true);
+        if (idle_speed > 0) {
+            k_work_reschedule(&loop_ticker_work, K_MSEC(idle_speed));
+        } else {
+            k_work_cancel_delayable(&loop_ticker_work);
+        }
     }
 }
 
@@ -142,6 +195,12 @@ void engine_notify_activity(void) {
         is_screen_idle = false;
         engine_trigger_refresh();
         k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
+        uint16_t active_speed = engine_get_active_loop_speed(false);
+        if (active_speed > 0) {
+            k_work_reschedule(&loop_ticker_work, K_MSEC(active_speed));
+        } else {
+            k_work_cancel_delayable(&loop_ticker_work);
+        }
     }
     k_work_reschedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
 }
@@ -160,6 +219,7 @@ void engine_init(lv_obj_t *canvas_obj) {
     is_screen_idle = false;
     current_bongo_state = 0;
     wpm_ticker_state = 0;
+    loop_ticker_state = 0;
 
     k_work_init_delayable(&idle_work, idle_work_cb);
     k_work_schedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
@@ -167,5 +227,11 @@ void engine_init(lv_obj_t *canvas_obj) {
     k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
     k_work_init_delayable(&wpm_ticker_work, wpm_ticker_work_cb);
     k_work_schedule(&wpm_ticker_work, K_MSEC(1000));
+
+    k_work_init_delayable(&loop_ticker_work, loop_ticker_work_cb);
+    uint16_t init_loop_speed = engine_get_active_loop_speed(false);
+    if (init_loop_speed > 0) {
+        k_work_schedule(&loop_ticker_work, K_MSEC(init_loop_speed));
+    }
 }
 

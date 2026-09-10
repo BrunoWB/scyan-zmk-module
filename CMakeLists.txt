@@ -17,6 +17,7 @@ if (CONFIG_ZMK_DISPLAY_STATUS_SCREEN_CUSTOM)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/widget_screensaver.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/widget_caps.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/widget_bongo.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/widgets/widget_loop.c
   )
 
   # Prioritize user config directory BEFORE any internal search paths

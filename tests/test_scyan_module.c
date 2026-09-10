@@ -24,6 +24,7 @@
 #include "widgets/widget_screensaver.c"
 #include "widgets/widget_caps.c"
 #include "widgets/widget_bongo.c"
+#include "widgets/widget_loop.c"
 
 // Test runner functions
 
@@ -397,6 +398,79 @@ void test_wpm_chart_widget(void) {
     printf("  -> WPM chart widget passed successfully.\n");
 }
 
+void test_loop_widget(void) {
+    printf("[TEST] Testing Loop animation widget sequence...\n");
+    struct display_layout_block loop_block = {
+        .type = WIDGET_TYPE_LOOP,
+        .x = 0,
+        .y = 0,
+        .width = 16,
+        .height = 16,
+        .enabled = true,
+        .mode = 0,
+        .param1 = 200,
+        .symbol_count = 3,
+        .symbol_ids = {
+            SYMBOL_CHARGE_0960,
+            SYMBOL_CHARGE_0960_SUB_1,
+            SYMBOL_CHARGE_0960_SUB_2,
+        },
+    };
+
+    struct custom_status_state state = {0};
+
+    // Frame 0
+    state.loop_tick = 0;
+    canvas_clear();
+    widget_dispatch_block(&loop_block, &state);
+    bool has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // Frame 1
+    state.loop_tick = 1;
+    canvas_clear();
+    widget_dispatch_block(&loop_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // Frame 3 (wraps back to frame 0 index)
+    state.loop_tick = 3;
+    canvas_clear();
+    widget_dispatch_block(&loop_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    // Text fallback mode when symbol_count == 0
+    loop_block.symbol_count = 0;
+    loop_block.custom_text = "LOOP";
+    canvas_clear();
+    widget_dispatch_block(&loop_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
+
+    printf("  -> Loop animation widget passed successfully.\n");
+}
+
 int main(void) {
     printf("=============================================\n");
     printf("Running unit test suite for scyan-zmk-module \n");
@@ -410,6 +484,7 @@ int main(void) {
     test_bongo_widget();
     test_battery_widget();
     test_wpm_chart_widget();
+    test_loop_widget();
 
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");
