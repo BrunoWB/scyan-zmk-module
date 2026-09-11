@@ -133,21 +133,19 @@ static uint16_t engine_get_active_loop_speed(bool is_idle) {
     return min_speed;
 }
 
-static uint8_t loop_ticker_state = 0;
+static uint32_t loop_ticker_state = 0;
 static struct k_work_delayable loop_ticker_work;
 
 static void loop_ticker_work_cb(struct k_work *work) {
     uint16_t speed = engine_get_active_loop_speed(is_screen_idle);
     if (speed > 0) {
-        if (loop_ticker_state < 255) {
-            loop_ticker_state++;
-        }
+        loop_ticker_state++;
         engine_trigger_refresh();
         k_work_reschedule(&loop_ticker_work, K_MSEC(speed));
     }
 }
 
-uint8_t engine_get_loop_tick(void) {
+uint32_t engine_get_loop_tick(void) {
     return loop_ticker_state;
 }
 

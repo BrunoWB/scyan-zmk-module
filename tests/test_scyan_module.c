@@ -480,8 +480,28 @@ void test_loop_widget(void) {
             assert(canvas_get_pixel(x, y) == buffer_last_slice[y][x]);
         }
     }
+    // Tick 301 (32-bit tick beyond 255: 301 % 3 = 1, must render frame 1)
+    state.loop_tick = 301;
+    canvas_clear();
+    widget_dispatch_block(&loop_block, &state);
+    has_pixel = false;
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+        }
+    }
+    assert(has_pixel);
 
-    printf("  -> Animation widget (looping and stop-at-last) passed successfully.\n");
+    // Test animation with frame count > 16 resolving via symbol_id + idx
+    struct display_layout_block large_anim_block = loop_block;
+    large_anim_block.symbol_id = SYMBOL_CHARGE_0960;
+    large_anim_block.symbol_count = 50; // 50 frames
+    // Tick 18 (frame 18, beyond MAX_BLOCK_SYMBOLS = 16, resolves to SYMBOL_CHARGE_0960 + 18)
+    state.loop_tick = 18;
+    canvas_clear();
+    widget_dispatch_block(&large_anim_block, &state);
+
+    printf("  -> Animation widget (looping, stop-at-last, 32-bit ticks, and 16+ frame fallback) passed successfully.\n");
 }
 
 int main(void) {

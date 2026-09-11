@@ -15,12 +15,15 @@ void widget_render_loop(const struct display_layout_block *b, const struct custo
         if (state) {
             bool no_loop = (b->param2 == 1);
             if (no_loop) {
-                idx = (state->loop_tick < b->symbol_count) ? state->loop_tick : (b->symbol_count - 1);
+                idx = (state->loop_tick < b->symbol_count) ? (uint8_t)state->loop_tick : (b->symbol_count - 1);
             } else {
-                idx = state->loop_tick % b->symbol_count;
+                idx = (uint8_t)(state->loop_tick % b->symbol_count);
             }
         }
-        canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
+        uint16_t sym = (idx < MAX_BLOCK_SYMBOLS && b->symbol_ids[idx] != 0)
+                     ? b->symbol_ids[idx]
+                     : (b->symbol_id + idx);
+        canvas_draw_symbol(b->x, b->y, sym);
     } else if (b->symbol_id != 0) {
         canvas_draw_symbol(b->x, b->y, b->symbol_id);
     } else {
