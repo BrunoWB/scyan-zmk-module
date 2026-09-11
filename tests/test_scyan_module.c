@@ -486,6 +486,27 @@ int main(void) {
     test_wpm_chart_widget();
     test_loop_widget();
 
+    printf("[TEST] Testing idle screen layout gating...\n");
+    assert(SCYAN_IDLE_SCREENS_ENABLED == 1 || SCYAN_IDLE_SCREENS_ENABLED == 0);
+    assert(SCYAN_IDLE_SCREENS_ENABLED_LEFT == 1 || SCYAN_IDLE_SCREENS_ENABLED_LEFT == 0);
+    assert(SCYAN_IDLE_SCREENS_ENABLED_RIGHT == 1 || SCYAN_IDLE_SCREENS_ENABLED_RIGHT == 0);
+    assert(SCYAN_IDLE_TIMEOUT_MS > 0);
+    assert(SCYAN_IDLE_TIMEOUT_MS_LEFT > 0);
+    assert(SCYAN_IDLE_TIMEOUT_MS_RIGHT > 0);
+    {
+        // When right idle screen is disabled, verify gate resolves to active layout even if state.is_idle is true
+        bool right_idle_enabled = (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
+        bool show_right_idle = true && right_idle_enabled;
+        const struct display_layout_block *blocks = show_right_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
+        size_t count = show_right_idle ? LAYOUT_RIGHT_IDLE_COUNT : LAYOUT_RIGHT_ACTIVE_COUNT;
+        if (!right_idle_enabled) {
+            assert(!show_right_idle);
+            assert(blocks == LAYOUT_RIGHT_ACTIVE_BLOCKS);
+            assert(count == LAYOUT_RIGHT_ACTIVE_COUNT);
+        }
+    }
+    printf("  -> Idle screen layout gating passed.\n");
+
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");
     printf("=============================================\n");

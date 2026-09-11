@@ -38,23 +38,38 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
     return true;
 }
 
+static bool engine_is_left_display(void) {
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
+    return (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+#else
+    return (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+#endif
+}
+
+static bool engine_idle_screens_enabled_for_half(void) {
+    bool is_left = engine_is_left_display();
+    return is_left ? (SCYAN_IDLE_SCREENS_ENABLED_LEFT != 0) : (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
+}
+
+static uint32_t engine_get_idle_timeout_ms_for_half(void) {
+    bool is_left = engine_is_left_display();
+    return is_left ? SCYAN_IDLE_TIMEOUT_MS_LEFT : SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+}
+
 static void engine_render(const struct custom_status_state *state) {
     if (!engine_canvas_obj) return;
 
     canvas_clear();
 
-    bool is_central;
-#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-    is_central = (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
-#else
-    is_central = (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
-#endif
+    bool is_central = engine_is_left_display();
+    bool idle_enabled = engine_idle_screens_enabled_for_half();
+    bool show_idle = state->is_idle && idle_enabled;
 
     const struct display_layout_block *blocks;
     size_t count;
 
     if (is_central) {
-        if (state->is_idle) {
+        if (show_idle) {
             blocks = LAYOUT_LEFT_IDLE_BLOCKS;
             count = LAYOUT_LEFT_IDLE_COUNT;
         } else {
@@ -62,7 +77,7 @@ static void engine_render(const struct custom_status_state *state) {
             count = LAYOUT_LEFT_ACTIVE_COUNT;
         }
     } else {
-        if (state->is_idle) {
+        if (show_idle) {
             blocks = LAYOUT_RIGHT_IDLE_BLOCKS;
             count = LAYOUT_RIGHT_IDLE_COUNT;
         } else {
@@ -92,21 +107,18 @@ void engine_update_state(struct custom_status_state state) {
 }
 
 static uint16_t engine_get_active_loop_speed(bool is_idle) {
-    bool is_central;
-#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-    is_central = (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
-#else
-    is_central = (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
-#endif
+    bool is_central = engine_is_left_display();
+    bool idle_enabled = engine_idle_screens_enabled_for_half();
+    bool effective_idle = is_idle && idle_enabled;
 
     const struct display_layout_block *blocks;
     size_t count;
     if (is_central) {
-        blocks = is_idle ? LAYOUT_LEFT_IDLE_BLOCKS : LAYOUT_LEFT_ACTIVE_BLOCKS;
-        count = is_idle ? LAYOUT_LEFT_IDLE_COUNT : LAYOUT_LEFT_ACTIVE_COUNT;
+        blocks = effective_idle ? LAYOUT_LEFT_IDLE_BLOCKS : LAYOUT_LEFT_ACTIVE_BLOCKS;
+        count = effective_idle ? LAYOUT_LEFT_IDLE_COUNT : LAYOUT_LEFT_ACTIVE_COUNT;
     } else {
-        blocks = is_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
-        count = is_idle ? LAYOUT_RIGHT_IDLE_COUNT : LAYOUT_RIGHT_ACTIVE_COUNT;
+        blocks = effective_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
+        count = effective_idle ? LAYOUT_RIGHT_IDLE_COUNT : LAYOUT_RIGHT_ACTIVE_COUNT;
     }
 
     uint16_t min_speed = 0;
@@ -138,6 +150,9 @@ uint8_t engine_get_loop_tick(void) {
 }
 
 static void idle_work_cb(struct k_work *work) {
+    if (!engine_idle_screens_enabled_for_half()) {
+        return;
+    }
     if (!is_screen_idle) {
         is_screen_idle = true;
         engine_trigger_refresh();
@@ -202,7 +217,12 @@ void engine_notify_activity(void) {
             k_work_cancel_delayable(&loop_ticker_work);
         }
     }
-    k_work_reschedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
+    if (engine_idle_screens_enabled_for_half()) {
+        uint32_t timeout_ms = engine_get_idle_timeout_ms_for_half();
+        if (timeout_ms > 0) {
+            k_work_reschedule(&idle_work, K_MSEC(timeout_ms));
+        }
+    }
 }
 
 bool engine_is_idle(void) {
@@ -222,7 +242,12 @@ void engine_init(lv_obj_t *canvas_obj) {
     loop_ticker_state = 0;
 
     k_work_init_delayable(&idle_work, idle_work_cb);
-    k_work_schedule(&idle_work, K_MSEC(CONFIG_SCYAN_IDLE_TIMEOUT_MS));
+    if (engine_idle_screens_enabled_for_half()) {
+        uint32_t timeout_ms = engine_get_idle_timeout_ms_for_half();
+        if (timeout_ms > 0) {
+            k_work_schedule(&idle_work, K_MSEC(timeout_ms));
+        }
+    }
 
     k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
     k_work_init_delayable(&wpm_ticker_work, wpm_ticker_work_cb);
