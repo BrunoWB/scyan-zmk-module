@@ -455,20 +455,33 @@ void test_loop_widget(void) {
     }
     assert(has_pixel);
 
-    // Text fallback mode when symbol_count == 0
-    loop_block.symbol_count = 0;
-    loop_block.custom_text = "LOOP";
+    // Test non-looping animation (param2 = 1, stop at last slice)
+    struct display_layout_block noloop_block = loop_block;
+    noloop_block.symbol_count = 3;
+    noloop_block.param2 = 1; // loop: false
+
+    // Tick 10 (far beyond symbol_count = 3, must render last slice = frame 2)
+    state.loop_tick = 10;
     canvas_clear();
-    widget_dispatch_block(&loop_block, &state);
-    has_pixel = false;
+    widget_dispatch_block(&noloop_block, &state);
+    uint8_t buffer_last_slice[DISPLAY_VIRTUAL_HEIGHT][DISPLAY_VIRTUAL_WIDTH];
     for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
         for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
-            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+            buffer_last_slice[y][x] = canvas_get_pixel(x, y);
         }
     }
-    assert(has_pixel);
 
-    printf("  -> Loop animation widget passed successfully.\n");
+    // Tick 2 (explicit frame 2)
+    state.loop_tick = 2;
+    canvas_clear();
+    widget_dispatch_block(&noloop_block, &state);
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            assert(canvas_get_pixel(x, y) == buffer_last_slice[y][x]);
+        }
+    }
+
+    printf("  -> Animation widget (looping and stop-at-last) passed successfully.\n");
 }
 
 int main(void) {

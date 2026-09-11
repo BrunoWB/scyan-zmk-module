@@ -89,3 +89,7 @@ struct custom_status_state {
 #define WIDGET_TYPE_LOOP 11
 #endif
 
+#ifndef WIDGET_TYPE_ANIMATION
+#define WIDGET_TYPE_ANIMATION WIDGET_TYPE_LOOP
+#endif
+

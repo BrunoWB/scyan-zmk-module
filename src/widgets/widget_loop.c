@@ -13,14 +13,19 @@ void widget_render_loop(const struct display_layout_block *b, const struct custo
     if (b->symbol_count > 0) {
         uint8_t idx = 0;
         if (state) {
-            idx = state->loop_tick % b->symbol_count;
+            bool no_loop = (b->param2 == 1);
+            if (no_loop) {
+                idx = (state->loop_tick < b->symbol_count) ? state->loop_tick : (b->symbol_count - 1);
+            } else {
+                idx = state->loop_tick % b->symbol_count;
+            }
         }
         canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
     } else if (b->symbol_id != 0) {
         canvas_draw_symbol(b->x, b->y, b->symbol_id);
     } else {
         const char *txt = (b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] :
-                          (b->custom_text ? b->custom_text : "LOOP");
+                          (b->custom_text ? b->custom_text : "ANIM");
         font_draw_text(b->x, b->y, font_get_small(), txt);
     }
 }

@@ -36,12 +36,16 @@ void widget_render_wpm(const struct display_layout_block *b, const struct custom
 
     if (b->mode == 1) {
         // Font / Text mode
-        if (b->text_count >= 2) {
-            int idx = ((int)state->wpm * (b->text_count - 1)) / target;
-            if (idx >= b->text_count) idx = b->text_count - 1;
-            if (idx < 0) idx = 0;
+        if (b->text_count >= 1) {
+            int idx = 0;
+            if (b->text_count > 1) {
+                idx = ((int)state->wpm * (b->text_count - 1)) / target;
+                if (idx >= b->text_count) idx = b->text_count - 1;
+                if (idx < 0) idx = 0;
+            }
             if (b->text_entries[idx]) {
-                font_draw_text(b->x, b->y, font_get_small(), b->text_entries[idx]);
+                const struct display_font *font = (b->param3 == 1) ? font_get_big() : font_get_small();
+                font_draw_text(b->x, b->y, font, b->text_entries[idx]);
             }
         } else {
             char buf[16];

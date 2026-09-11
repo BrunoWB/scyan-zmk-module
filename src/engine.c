@@ -139,7 +139,9 @@ static struct k_work_delayable loop_ticker_work;
 static void loop_ticker_work_cb(struct k_work *work) {
     uint16_t speed = engine_get_active_loop_speed(is_screen_idle);
     if (speed > 0) {
-        loop_ticker_state++;
+        if (loop_ticker_state < 255) {
+            loop_ticker_state++;
+        }
         engine_trigger_refresh();
         k_work_reschedule(&loop_ticker_work, K_MSEC(speed));
     }
@@ -155,6 +157,7 @@ static void idle_work_cb(struct k_work *work) {
     }
     if (!is_screen_idle) {
         is_screen_idle = true;
+        loop_ticker_state = 0;
         engine_trigger_refresh();
         uint16_t idle_speed = engine_get_active_loop_speed(true);
         if (idle_speed > 0) {
@@ -208,6 +211,7 @@ uint8_t engine_get_bongo_state(void) {
 void engine_notify_activity(void) {
     if (is_screen_idle) {
         is_screen_idle = false;
+        loop_ticker_state = 0;
         engine_trigger_refresh();
         k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
         uint16_t active_speed = engine_get_active_loop_speed(false);
