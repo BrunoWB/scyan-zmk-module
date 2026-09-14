@@ -18,6 +18,9 @@ void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj) {
 #if IS_ENABLED(CONFIG_SCYAN_ROTATION_270)
             hx = vy;
             hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
+#elif IS_ENABLED(CONFIG_SCYAN_ROTATION_180)
+            hx = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
+            hy = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
 #elif IS_ENABLED(CONFIG_SCYAN_ROTATION_0)
             hx = vx;
             hy = vy;

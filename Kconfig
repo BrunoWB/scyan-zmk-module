@@ -13,10 +13,13 @@ config SCYAN_ROTATION_90
     bool "90 degrees (standard vertical Corne mounting)"
 
 config SCYAN_ROTATION_270
-    bool "270 degrees (inverted 180 degrees)"
+    bool "270 degrees (counter-clockwise)"
+
+config SCYAN_ROTATION_180
+    bool "180 degrees (upside-down)"
 
 config SCYAN_ROTATION_0
-    bool "0 degrees (horizontal)"
+    bool "0 degrees (horizontal / no rotation)"
 
 endchoice
 
