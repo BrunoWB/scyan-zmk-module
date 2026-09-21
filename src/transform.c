@@ -6,7 +6,7 @@
 #include "transform.h"
 #include "canvas.h"
 
-void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj) {
+void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj, int rotation) {
     if (!canvas_obj) return;
 
     const uint8_t (*vbuf)[DISPLAY_VIRTUAL_WIDTH] = canvas_get_vbuf();
@@ -15,19 +15,25 @@ void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj) {
         for (int vx = 0; vx < DISPLAY_VIRTUAL_WIDTH; vx++) {
             int hx, hy;
 
-#if IS_ENABLED(CONFIG_SCYAN_ROTATION_270)
-            hx = vy;
-            hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
-#elif IS_ENABLED(CONFIG_SCYAN_ROTATION_180)
-            hx = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
-            hy = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
-#elif IS_ENABLED(CONFIG_SCYAN_ROTATION_0)
-            hx = vx;
-            hy = vy;
-#else // Default: 90 degrees (CONFIG_SCYAN_ROTATION_90)
-            hx = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
-            hy = vx;
-#endif
+            switch (rotation) {
+            case 270:
+                hx = vy;
+                hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
+                break;
+            case 180:
+                hx = (DISPLAY_VIRTUAL_WIDTH - 1) - vx;
+                hy = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
+                break;
+            case 0:
+                hx = vx;
+                hy = vy;
+                break;
+            case 90:
+            default:
+                hx = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy;
+                hy = vx;
+                break;
+            }
 
             if (hx < 0 || hx >= DISPLAY_HW_WIDTH || hy < 0 || hy >= DISPLAY_HW_HEIGHT) {
                 continue;

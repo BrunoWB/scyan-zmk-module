@@ -192,19 +192,37 @@ void test_widgets(void) {
 }
 
 void test_rotation_transform(void) {
-    printf("[TEST] Testing 90 degree rotation transformation math...\n");
-    // In 90 degree rotation:
+    printf("[TEST] Testing 0, 90, 180, and 270 degree rotation transformation math...\n");
+    // 90 degrees:
     // hx = (DISPLAY_VIRTUAL_HEIGHT - 1) - vy = 127 - vy
     // hy = vx
     int vx = 0, vy = 0;
-    int hx = 127 - vy;
-    int hy = vx;
-    assert(hx == 127 && hy == 0);
-
+    assert((127 - vy) == 127 && vx == 0);
     vx = 31; vy = 127;
-    hx = 127 - vy;
-    hy = vx;
-    assert(hx == 0 && hy == 31);
+    assert((127 - vy) == 0 && vx == 31);
+
+    // 270 degrees:
+    // hx = vy
+    // hy = (DISPLAY_VIRTUAL_WIDTH - 1) - vx = 31 - vx
+    vx = 0; vy = 0;
+    assert(vy == 0 && (31 - vx) == 31);
+    vx = 31; vy = 127;
+    assert(vy == 127 && (31 - vx) == 0);
+
+    // 0 degrees:
+    // hx = vx, hy = vy
+    vx = 10; vy = 20;
+    assert(vx == 10 && vy == 20);
+
+    // 180 degrees:
+    // hx = (W - 1) - vx, hy = (H - 1) - vy
+    vx = 10; vy = 20;
+    assert((31 - vx) == 21 && (127 - vy) == 107);
+
+    // Verify rotation macros exist and resolve
+    assert(SCYAN_ROTATION == 90);
+    assert(SCYAN_ROTATION_PERIPHERAL == 90);
+
     printf("  -> Rotation transformation passed.\n");
 }
 

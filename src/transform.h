@@ -12,5 +12,5 @@
  * Maps the 32x128 virtual canvas into the 128x32 hardware LVGL canvas object,
  * applying configured rotation and color inversion.
  */
-void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj);
+void transform_flush_to_lvgl_canvas(lv_obj_t *canvas_obj, int rotation);
 

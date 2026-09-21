@@ -88,6 +88,21 @@ static uint32_t engine_get_idle_timeout_ms_for_half(void) {
 #endif
 }
 
+static int engine_get_rotation_for_half(void) {
+#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
+    return SCYAN_ROTATION_LEFT;
+#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO) || !defined(CONFIG_SCYAN_DISPLAY_SLOT)
+#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+    if (engine_is_secondary_peripheral()) {
+        return SCYAN_ROTATION_RIGHT;
+    }
+#endif
+    return engine_is_left_display() ? SCYAN_ROTATION_LEFT : SCYAN_ROTATION_RIGHT;
+#else
+    return SCYAN_ROTATION_RIGHT;
+#endif
+}
+
 static void engine_get_layout_blocks(bool show_idle, const struct display_layout_block **blocks_out, size_t *count_out) {
 #if defined(SCYAN_ACTIVE_BLOCKS) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO)
     *blocks_out = show_idle ? SCYAN_IDLE_BLOCKS : SCYAN_ACTIVE_BLOCKS;
@@ -126,7 +141,7 @@ static void engine_render(const struct custom_status_state *state) {
         widget_dispatch_block(&blocks[i], state);
     }
 
-    transform_flush_to_lvgl_canvas(engine_canvas_obj);
+    transform_flush_to_lvgl_canvas(engine_canvas_obj, engine_get_rotation_for_half());
 }
 
 void engine_update_state(struct custom_status_state state) {
