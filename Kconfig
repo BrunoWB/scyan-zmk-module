@@ -42,6 +42,33 @@ config SCYAN_LEFT_IS_CENTRAL
       When enabled, the split Central half renders LAYOUT_LEFT_* blocks and Peripheral renders
       LAYOUT_RIGHT_* blocks. When disabled, Central renders LAYOUT_RIGHT_* and Peripheral renders LAYOUT_LEFT_*.
 
+choice SCYAN_DISPLAY_SLOT
+    prompt "Display Layout Slot Selection"
+    default SCYAN_DISPLAY_SLOT_AUTO
+    help
+      Select which slotted display layout this firmware image should render.
+
+config SCYAN_DISPLAY_SLOT_AUTO
+    bool "Automatic (Central -> Display 1, Peripheral -> Display 2)"
+
+config SCYAN_DISPLAY_SLOT_1
+    bool "Display Slot 1 (Primary / Central / Left)"
+
+config SCYAN_DISPLAY_SLOT_2
+    bool "Display Slot 2 (Secondary / Peripheral / Right)"
+
+config SCYAN_DISPLAY_SLOT_3
+    bool "Display Slot 3 (Tertiary / Peripheral 2)"
+
+endchoice
+
+config SCYAN_PERIPHERAL_SLOT_2
+    bool "Secondary peripheral display layout (Legacy alias for Slot 3)"
+    default n
+    help
+      When enabled on a peripheral half in a multi-peripheral setup, the display renders
+      LAYOUT_PERIPHERAL_2_* blocks instead of standard LAYOUT_PERIPHERAL_* blocks.
+
 config SCYAN_USER_NAME
     string "Default branding user name"
     default "SCYAN"

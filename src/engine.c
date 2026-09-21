@@ -39,21 +39,59 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
 }
 
 static bool engine_is_left_display(void) {
-#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-    return (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT)
+    return true;
+#elif IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
+    return IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL);
 #else
-    return (IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL));
+    return !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL);
+#endif
+}
+
+static bool engine_is_secondary_peripheral(void) {
+#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_3) || IS_ENABLED(CONFIG_SCYAN_PERIPHERAL_SLOT_2)
+    return true;
+#elif defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+#if defined(CONFIG_SHIELD_THREE_PARTS_RIGHT) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_2)
+    return true;
+#else
+    return false;
+#endif
+#else
+    return false;
 #endif
 }
 
 static bool engine_idle_screens_enabled_for_half(void) {
+#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
+    return (SCYAN_IDLE_SCREENS_ENABLED_LEFT != 0);
+#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_2) || IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_3)
+    return (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
+#else
+#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+    if (engine_is_secondary_peripheral()) {
+        return (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
+    }
+#endif
     bool is_left = engine_is_left_display();
     return is_left ? (SCYAN_IDLE_SCREENS_ENABLED_LEFT != 0) : (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
+#endif
 }
 
 static uint32_t engine_get_idle_timeout_ms_for_half(void) {
+#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
+    return SCYAN_IDLE_TIMEOUT_MS_LEFT;
+#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_2) || IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_3)
+    return SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+#else
+#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+    if (engine_is_secondary_peripheral()) {
+        return SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+    }
+#endif
     bool is_left = engine_is_left_display();
     return is_left ? SCYAN_IDLE_TIMEOUT_MS_LEFT : SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+#endif
 }
 
 static void engine_render(const struct custom_status_state *state) {
@@ -68,6 +106,58 @@ static void engine_render(const struct custom_status_state *state) {
     const struct display_layout_block *blocks;
     size_t count;
 
+#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
+    if (show_idle) {
+        blocks = LAYOUT_DISPLAY_1_IDLE_BLOCKS;
+        count = LAYOUT_DISPLAY_1_IDLE_COUNT;
+    } else {
+        blocks = LAYOUT_DISPLAY_1_ACTIVE_BLOCKS;
+        count = LAYOUT_DISPLAY_1_ACTIVE_COUNT;
+    }
+#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_2)
+    if (show_idle) {
+        blocks = LAYOUT_DISPLAY_2_IDLE_BLOCKS;
+        count = LAYOUT_DISPLAY_2_IDLE_COUNT;
+    } else {
+        blocks = LAYOUT_DISPLAY_2_ACTIVE_BLOCKS;
+        count = LAYOUT_DISPLAY_2_ACTIVE_COUNT;
+    }
+#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_3)
+    if (show_idle) {
+#if defined(LAYOUT_DISPLAY_3_IDLE_BLOCKS)
+        blocks = LAYOUT_DISPLAY_3_IDLE_BLOCKS;
+        count = LAYOUT_DISPLAY_3_IDLE_COUNT;
+#elif defined(LAYOUT_PERIPHERAL_2_IDLE_BLOCKS)
+        blocks = LAYOUT_PERIPHERAL_2_IDLE_BLOCKS;
+        count = LAYOUT_PERIPHERAL_2_IDLE_COUNT;
+#else
+        blocks = LAYOUT_RIGHT_IDLE_BLOCKS;
+        count = LAYOUT_RIGHT_IDLE_COUNT;
+#endif
+    } else {
+#if defined(LAYOUT_DISPLAY_3_ACTIVE_BLOCKS)
+        blocks = LAYOUT_DISPLAY_3_ACTIVE_BLOCKS;
+        count = LAYOUT_DISPLAY_3_ACTIVE_COUNT;
+#elif defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+        blocks = LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS;
+        count = LAYOUT_PERIPHERAL_2_ACTIVE_COUNT;
+#else
+        blocks = LAYOUT_RIGHT_ACTIVE_BLOCKS;
+        count = LAYOUT_RIGHT_ACTIVE_COUNT;
+#endif
+    }
+#else
+#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
+    if (engine_is_secondary_peripheral()) {
+        if (show_idle) {
+            blocks = LAYOUT_PERIPHERAL_2_IDLE_BLOCKS;
+            count = LAYOUT_PERIPHERAL_2_IDLE_COUNT;
+        } else {
+            blocks = LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS;
+            count = LAYOUT_PERIPHERAL_2_ACTIVE_COUNT;
+        }
+    } else
+#endif
     if (is_central) {
         if (show_idle) {
             blocks = LAYOUT_LEFT_IDLE_BLOCKS;
@@ -85,6 +175,7 @@ static void engine_render(const struct custom_status_state *state) {
             count = LAYOUT_RIGHT_ACTIVE_COUNT;
         }
     }
+#endif
 
     for (size_t i = 0; i < count; i++) {
         widget_dispatch_block(&blocks[i], state);

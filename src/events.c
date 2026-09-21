@@ -10,11 +10,13 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/display.h>
 #include <zmk/event_manager.h>
+#if IS_ENABLED(CONFIG_ZMK_BATTERY)
 #include <zmk/events/battery_state_changed.h>
+#include <zmk/battery.h>
+#endif
 #include <zmk/events/endpoint_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/events/position_state_changed.h>
-#include <zmk/battery.h>
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
 
@@ -89,8 +91,12 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
     memset(&s, 0, sizeof(s));
 
     // Battery status
+#if IS_ENABLED(CONFIG_ZMK_BATTERY)
     const struct zmk_battery_state_changed *batt_ev = as_zmk_battery_state_changed(eh);
     s.battery_level = (batt_ev != NULL) ? batt_ev->state_of_charge : zmk_battery_state_of_charge();
+#else
+    s.battery_level = 100;
+#endif
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
     s.charging = zmk_usb_is_powered();
 #endif
@@ -170,7 +176,9 @@ static void update_cb(struct custom_status_state state) {
 ZMK_DISPLAY_WIDGET_LISTENER(scyan_status_listener, struct custom_status_state,
                             update_cb, events_get_current_state)
 
+#if IS_ENABLED(CONFIG_ZMK_BATTERY)
 ZMK_SUBSCRIPTION(scyan_status_listener, zmk_battery_state_changed);
+#endif
 
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
 ZMK_SUBSCRIPTION(scyan_status_listener, zmk_usb_conn_state_changed);

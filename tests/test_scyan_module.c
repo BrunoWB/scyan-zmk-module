@@ -538,7 +538,13 @@ int main(void) {
             assert(count == LAYOUT_RIGHT_ACTIVE_COUNT);
         }
     }
-    printf("  -> Idle screen layout gating passed.\n");
+    printf("[TEST] Testing slotted display layouts (Display 1 & Display 2)...\n");
+    assert(LAYOUT_DISPLAY_1_ACTIVE_COUNT > 0);
+    assert(LAYOUT_DISPLAY_1_ACTIVE_BLOCKS != NULL);
+    assert(LAYOUT_DISPLAY_2_ACTIVE_BLOCKS != NULL);
+    assert(LAYOUT_DISPLAY_1_IDLE_BLOCKS != NULL);
+    assert(LAYOUT_DISPLAY_2_IDLE_BLOCKS != NULL);
+    printf("  -> Slotted display layouts passed.\n");
 
     printf("=============================================\n");
     printf("ALL TESTS PASSED SUCCESSFULLY!               \n");
