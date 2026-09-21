@@ -27,7 +27,7 @@ config SCYAN_INVERT
     bool "Invert display colors"
     default y
     help
-      Inverts monochrome pixels (swap black and white for SSD1306 displays).
+      Inverts monochrome pixels (swap black and white).
 
 config SCYAN_IDLE_TIMEOUT_MS
     int "Idle screen timeout in milliseconds"

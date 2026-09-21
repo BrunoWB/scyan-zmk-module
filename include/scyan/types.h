@@ -90,8 +90,8 @@
 #define CONFIG_SCYAN_USER_NAME "SCYAN"
 #endif
 
-#define CANVAS_WIDTH  DISPLAY_HW_WIDTH   // 128
-#define CANVAS_HEIGHT DISPLAY_HW_HEIGHT  // 32
+#define CANVAS_WIDTH  DISPLAY_HW_WIDTH
+#define CANVAS_HEIGHT DISPLAY_HW_HEIGHT
 
 /**
  * Snapshot of keyboard runtime state for rendering.
