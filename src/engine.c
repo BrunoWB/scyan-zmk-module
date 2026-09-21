@@ -49,14 +49,10 @@ static bool engine_is_left_display(void) {
 }
 
 static bool engine_is_secondary_peripheral(void) {
-#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_3) || IS_ENABLED(CONFIG_SCYAN_PERIPHERAL_SLOT_2)
+#if IS_ENABLED(CONFIG_SCYAN_PERIPHERAL_SLOT_2)
     return true;
-#elif defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
-#if defined(CONFIG_SHIELD_THREE_PARTS_RIGHT) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_2)
+#elif defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS) && defined(CONFIG_SHIELD_THREE_PARTS_RIGHT)
     return true;
-#else
-    return false;
-#endif
 #else
     return false;
 #endif
