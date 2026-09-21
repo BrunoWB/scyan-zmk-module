@@ -60,6 +60,15 @@ config SCYAN_DISPLAY_SLOT_2
 config SCYAN_DISPLAY_SLOT_3
     bool "Display Slot 3 (Tertiary / Peripheral 2)"
 
+config SCYAN_DISPLAY_SLOT_4
+    bool "Display Slot 4 (Quaternary / Auxiliary)"
+
+config SCYAN_DISPLAY_SLOT_5
+    bool "Display Slot 5"
+
+config SCYAN_DISPLAY_SLOT_6
+    bool "Display Slot 6"
+
 endchoice
 
 config SCYAN_PERIPHERAL_SLOT_2
