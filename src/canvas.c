@@ -7,9 +7,15 @@
 #include <stdlib.h>
 #include "canvas.h"
 
+/* Ensure symbol table and atlas are anchored and preserved by linker */
+__attribute__((used)) static const uint8_t * const _scyan_symbols_atlas_anchor = SYMBOLS_ATLAS;
+__attribute__((used)) static const struct sprite_slice * const _scyan_symbol_slices_anchor = SYMBOL_SLICES;
+
 static uint8_t vbuf[DISPLAY_VIRTUAL_HEIGHT][DISPLAY_VIRTUAL_WIDTH];
 
 void canvas_clear(void) {
+    /* Reference symbols to ensure table is kept even under aggressive linker GC */
+    __asm__ __volatile__("" : : "r"(SYMBOLS_ATLAS), "r"(SYMBOL_SLICES) : "memory");
     memset(vbuf, 0, sizeof(vbuf));
 }
 

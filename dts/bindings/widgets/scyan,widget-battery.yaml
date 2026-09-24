@@ -1,0 +1,20 @@
+# Copyright (c) 2026 Bruno Barcellos
+# SPDX-License-Identifier: MIT
+
+description: "Scyan widget: battery"
+compatible: "scyan,widget-battery"
+
+properties:
+  x: { type: int, required: true }
+  y: { type: int, required: true }
+  width: { type: int, required: true }
+  height: { type: int, required: true }
+  enabled: { type: int, default: 1 }
+  mode: { type: int, default: 0 }
+  param1: { type: int, default: 0 }
+  param2: { type: int, default: 0 }
+  param3: { type: int, default: 0 }
+  symbols: { type: array, required: false }
+  text-entries: { type: string-array, required: false }
+  custom-text: { type: string, required: false }
+  symbol-id: { type: int, default: 0 }

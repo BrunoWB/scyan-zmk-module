@@ -1,0 +1,29 @@
+# Copyright (c) 2026 Bruno Barcellos
+# SPDX-License-Identifier: MIT
+
+description: "Scyan OLED display layout root container"
+compatible: "scyan,display-layout"
+
+properties:
+  display-name:
+    type: string
+    description: "Human-readable label for IDE preview"
+  width:
+    type: int
+    default: 32
+  height:
+    type: int
+    default: 128
+  rotation:
+    type: int
+    default: 90
+  invert:
+    type: boolean
+  idle-timeout-ms:
+    type: int
+    default: 10000
+  idle-layout:
+    type: phandle
+    required: false
+    description: "Phandle to the corresponding idle scyan,display-layout node"
+

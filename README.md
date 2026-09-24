@@ -35,7 +35,8 @@ It interprets 2-Atlas spritesheets, custom font glyphs, and dynamic screen layou
 
 - **🎨 2-Atlas Direct Blitting**: Fast 1bpp bitwise rasterizer for `SYMBOLS_ATLAS` (icons, frames, gauges) and `FONT_ATLAS` (custom fonts and glyphs).
 - **🔤 Dynamic UTF-8 & Font Engine**: Variable-width character rendering supporting small, big, digits, and text font styles.
-- **🧩 10 Dynamic Widget Types**:
+- **🌳 Native Zephyr Devicetree Layouts (v2.0.0)**: Declarative Devicetree node hierarchy (`scyan,layouts`, `scyan,display-layout`, and `scyan,widget-*`) eliminating legacy hardcoded C layout arrays.
+- **🧩 13 Dynamic Widget Types**:
   - `WIDGET_TYPE_OUTPUT_STATUS`: USB / BLE profile connection status.
   - `WIDGET_TYPE_BATTERY`: Discrete multi-state symbol bars or text % divisions.
   - `WIDGET_TYPE_LAYER`: Dynamic layer numbers, layer names, bracket frames, or skull art.
@@ -45,9 +46,13 @@ It interprets 2-Atlas spritesheets, custom font glyphs, and dynamic screen layou
   - `WIDGET_TYPE_SPLIT`: Split link interconnect status (chain icon or status text).
   - `WIDGET_TYPE_SCREENSAVER`: Low-power static idle artwork.
   - `WIDGET_TYPE_CAPS_LOCK`: Caps lock state indicator.
+  - `WIDGET_TYPE_BONGO`: Reactive animated Bongo Cat paws responsive to typing.
+  - `WIDGET_TYPE_LOOP`: Multi-frame looping animations with extended frame sequencing (>16 frames via param3).
+  - `WIDGET_TYPE_TYPEWRITER`: Interactive keystroke typewriter with spot, inline, and random placement modes plus auto-cleaning.
+  - `WIDGET_TYPE_KEYPRESS`: Active key tracking with pressed/released states and idle fallback symbols.
 - **⚡ Zero Typing Lag**: Key events update activity timestamps without interrupting keyboard scanning; re-rendering is debounced onto ZMK's dedicated display thread.
-- **🔄 Rotation & Transform Pipeline**: Supports 90° and 270° orientation transforms and monochrome color inversion.
-- **🌗 Split Central & Peripheral Synchronization**: Automatically renders `LAYOUT_LEFT_*` blocks on the Central half and `LAYOUT_RIGHT_*` blocks on the Peripheral half.
+- **🔄 Rotation & Transform Pipeline**: Supports 0°, 90°, 180°, and 270° orientation transforms and monochrome color inversion.
+- **🌗 Split Central & Peripheral Synchronization**: Automatically binds display layouts to hardware shields via `/chosen { scyan,display-layout = &...; };`.
 - **⏱️ Active & Idle Screen Transition**: Automatically switches to idle blocks after a configurable timeout (default 10s) and wakes up immediately on the next keystroke.
 
 ---
@@ -76,6 +81,10 @@ Add these options to your `corne.conf` (or target shield config) in `zmk-config`
 scyan-zmk-module/
 ├── zephyr/
 │   └── module.yml                  # Zephyr / West module declaration
+├── dts/
+│   └── bindings/                   # Devicetree layout & widget bindings
+│       ├── display/                # scyan,layouts and scyan,display-layout
+│       └── widgets/                # 13 scyan,widget-* hardware bindings
 ├── CMakeLists.txt                  # Priority include pathing & source compilation
 ├── Kconfig                         # Module configuration definitions
 ├── include/
@@ -84,13 +93,14 @@ scyan-zmk-module/
 │       └── types.h                 # Core types, contracts, and fail-fast header guards
 ├── src/
 │   ├── status_screen.c             # zmk_display_status_screen() implementation
-│   ├── engine.c                    # State diffing, dirty checking, and work queue scheduler
+│   ├── engine.c                    # Devicetree layout unrolling, dirty checking & scheduler
 │   ├── canvas.c                    # 1bpp virtual buffer (32x128) drawing primitives
-│   ├── transform.c                 # Rotation (90°/270°) and color inversion transforms
+│   ├── transform.c                 # Rotation (0°/90°/180°/270°) and color inversion transforms
 │   ├── font_renderer.c             # UTF-8 parser and variable-width glyph rasterizer
-│   ├── events.c                    # ZMK event listeners (Battery, USB, BLE, Layer, WPM, Split)
+│   ├── events.c                    # ZMK event listeners (Battery, USB, BLE, Layer, WPM, Split, Keycode)
 │   └── widgets/
 │       ├── widgets.h               # Widget dispatch definitions
+│       ├── dispatch.c              # Layout block dispatcher
 │       ├── widget_output.c         # Output status widget
 │       ├── widget_battery.c        # Battery level widget
 │       ├── widget_layer.c          # Active layer widget
@@ -98,7 +108,11 @@ scyan-zmk-module/
 │       ├── widget_branding.c       # Branding & custom text widget
 │       ├── widget_split.c          # Split peripheral link widget
 │       ├── widget_screensaver.c    # Idle screensaver widget
-│       └── widget_caps.c           # Caps Lock widget
+│       ├── widget_caps.c           # Caps Lock widget
+│       ├── widget_bongo.c          # Reactive Bongo Cat widget
+│       ├── widget_loop.c           # Multi-frame looping animation widget
+│       ├── widget_typewriter.c     # Keystroke typewriter widget
+│       └── widget_keypress.c       # Dynamic active keypress widget
 └── tests/
     ├── mock_zmk.h                  # Host test mocks
     └── test_scyan_module.c         # Unit test suite
@@ -108,10 +122,10 @@ scyan-zmk-module/
 
 ## 🧪 Testing
 
-The repository includes a host-executable test suite that validates the rasterizer, font rendering, widget dispatcher, and orientation math against generated layout headers:
+The repository includes a host-executable test suite that validates the rasterizer, font rendering, Devicetree layout unrolling, widget dispatcher, and orientation math:
 
 ```bash
-gcc -Wall -Wextra -Werror -I. -Iinclude -Isrc -Itests -I../zmk-config/config tests/test_scyan_module.c -o tests/test_runner
-./tests/test_runner
+gcc -Wall -Wextra -Wno-unused-parameter -I. -Iinclude -Isrc -Itests tests/test_scyan_module.c -o tests/test_runner
+sh -c "exec tests/test_runner"
 ```
 

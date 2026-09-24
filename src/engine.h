@@ -19,4 +19,8 @@ void engine_bongo_tap(bool is_left);
 uint8_t engine_get_bongo_state(void);
 uint8_t engine_get_wpm_tick(void);
 uint32_t engine_get_loop_tick(void);
+uint16_t engine_get_keypress_count(void);
+void engine_increment_keypress_count(void);
+void engine_schedule_typewriter_cleaning(uint32_t delay_ms);
+bool engine_has_wpm_chart(bool is_idle);
 

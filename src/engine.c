@@ -4,14 +4,26 @@
  */
 
 #include <string.h>
+#if __has_include(<zephyr/logging/log.h>)
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#else
+#define LOG_MODULE_DECLARE(...)
+#endif
+
+#if __has_include(<zephyr/devicetree.h>)
+#include <zephyr/devicetree.h>
+#endif
 
 #include <zmk/display.h>
 #include "engine.h"
 #include "canvas.h"
 #include "transform.h"
 #include "widgets/widgets.h"
+
+#ifndef DT_HAS_CHOSEN
+#define DT_HAS_CHOSEN(node) 0
+#endif
 
 static lv_obj_t *engine_canvas_obj = NULL;
 static struct custom_status_state last_rendered_state;
@@ -35,93 +47,121 @@ static bool states_equal(const struct custom_status_state *a, const struct custo
     if (a->bongo_state != b->bongo_state) return false;
     if (a->wpm_tick != b->wpm_tick) return false;
     if (a->loop_tick != b->loop_tick) return false;
+    if (a->keypress_count != b->keypress_count) return false;
     return true;
 }
 
-static bool engine_is_left_display(void) {
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT)
-    return true;
-#elif IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-    return IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL);
-#else
-    return !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL);
+BUILD_ASSERT(DT_HAS_CHOSEN(scyan_display_layout),
+             "Scyan ZMK: /chosen is missing 'scyan,display-layout'! Ensure overlay uses 'scyan,display-layout = &layout;' without angle brackets.");
+
+#if DT_HAS_CHOSEN(scyan_display_layout)
+#define CHOSEN_ACTIVE_LAYOUT DT_CHOSEN(scyan_display_layout)
+
+#define _SCYAN_SYM_ELEM(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx),
+#define _SCYAN_TXT_ELEM(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx),
+
+#define SCYAN_WIDGET_TYPE(node) \
+    (DT_NODE_HAS_COMPAT(node, scyan_widget_output) ? WIDGET_TYPE_OUTPUT_STATUS : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_battery) ? WIDGET_TYPE_BATTERY : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_layer) ? WIDGET_TYPE_LAYER : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_wpm) ? WIDGET_TYPE_WPM : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_wpm_chart) ? WIDGET_TYPE_WPM_CHART : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_branding) ? WIDGET_TYPE_BRANDING : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_split) ? WIDGET_TYPE_SPLIT : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_screensaver) ? WIDGET_TYPE_SCREENSAVER : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_caps) ? WIDGET_TYPE_CAPS_LOCK : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_bongo) ? WIDGET_TYPE_BONGO : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_loop) ? WIDGET_TYPE_LOOP : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_typewriter) ? WIDGET_TYPE_TYPEWRITER : \
+     DT_NODE_HAS_COMPAT(node, scyan_widget_keypress) ? WIDGET_TYPE_KEYPRESS : \
+     WIDGET_TYPE_NONE)
+
+#define SCYAN_DT_BLOCK_ITEM(node) \
+    { \
+        .type = SCYAN_WIDGET_TYPE(node), \
+        .x = DT_PROP_OR(node, x, 0), \
+        .y = DT_PROP_OR(node, y, 0), \
+        .width = DT_PROP_OR(node, width, 0), \
+        .height = DT_PROP_OR(node, height, 0), \
+        .enabled = DT_PROP_OR(node, enabled, 1), \
+        .mode = DT_PROP_OR(node, mode, 0), \
+        .param1 = DT_PROP_OR(node, param1, 0), \
+        .param2 = DT_PROP_OR(node, param2, 0), \
+        .param3 = DT_PROP_OR(node, param3, 0), \
+        .symbol_count = COND_CODE_1(DT_NODE_HAS_PROP(node, symbols), (DT_PROP_LEN(node, symbols)), (0)), \
+        .symbol_ids = { \
+            COND_CODE_1(DT_NODE_HAS_PROP(node, symbols), \
+                (DT_FOREACH_PROP_ELEM(node, symbols, _SCYAN_SYM_ELEM)), (0)) \
+        }, \
+        .text_count = COND_CODE_1(DT_NODE_HAS_PROP(node, text_entries), (DT_PROP_LEN(node, text_entries)), (0)), \
+        .text_entries = { \
+            COND_CODE_1(DT_NODE_HAS_PROP(node, text_entries), \
+                (DT_FOREACH_PROP_ELEM(node, text_entries, _SCYAN_TXT_ELEM)), (NULL)) \
+        }, \
+        .custom_text = DT_PROP_OR(node, custom_text, NULL), \
+        .symbol_id = DT_PROP_OR(node, symbol_id, 0), \
+    },
+
+static const struct display_layout_block chosen_active_blocks[] = {
+    DT_FOREACH_CHILD(CHOSEN_ACTIVE_LAYOUT, SCYAN_DT_BLOCK_ITEM)
+    { .type = WIDGET_TYPE_NONE, .enabled = 0 }
+};
+#define CHOSEN_ACTIVE_COUNT (ARRAY_SIZE(chosen_active_blocks) - 1)
+
+#if DT_NODE_HAS_PROP(CHOSEN_ACTIVE_LAYOUT, idle_layout)
+#define CHOSEN_IDLE_LAYOUT DT_PHANDLE(CHOSEN_ACTIVE_LAYOUT, idle_layout)
+static const struct display_layout_block chosen_idle_blocks[] = {
+    DT_FOREACH_CHILD(CHOSEN_IDLE_LAYOUT, SCYAN_DT_BLOCK_ITEM)
+    { .type = WIDGET_TYPE_NONE, .enabled = 0 }
+};
+#define CHOSEN_IDLE_COUNT (ARRAY_SIZE(chosen_idle_blocks) - 1)
 #endif
-}
+#endif
 
-static bool engine_is_secondary_peripheral(void) {
-#if IS_ENABLED(CONFIG_SCYAN_PERIPHERAL_SLOT_2)
+static bool engine_idle_screens_enabled_for_half(void) {
+#if DT_HAS_CHOSEN(scyan_display_layout)
+#if DT_NODE_HAS_PROP(CHOSEN_ACTIVE_LAYOUT, idle_layout)
     return true;
-#elif defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS) && defined(CONFIG_SHIELD_THREE_PARTS_RIGHT)
-    return true;
+#else
+    return false;
+#endif
 #else
     return false;
 #endif
 }
 
-static bool engine_idle_screens_enabled_for_half(void) {
-#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
-    return (SCYAN_IDLE_SCREENS_ENABLED_LEFT != 0);
-#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO) || !defined(CONFIG_SCYAN_DISPLAY_SLOT)
-#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
-    if (engine_is_secondary_peripheral()) {
-        return (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
-    }
-#endif
-    return engine_is_left_display() ? (SCYAN_IDLE_SCREENS_ENABLED_LEFT != 0) : (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
-#else
-    return (SCYAN_IDLE_SCREENS_ENABLED_RIGHT != 0);
-#endif
-}
-
 static uint32_t engine_get_idle_timeout_ms_for_half(void) {
-#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
-    return SCYAN_IDLE_TIMEOUT_MS_LEFT;
-#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO) || !defined(CONFIG_SCYAN_DISPLAY_SLOT)
-#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
-    if (engine_is_secondary_peripheral()) {
-        return SCYAN_IDLE_TIMEOUT_MS_RIGHT;
-    }
-#endif
-    return engine_is_left_display() ? SCYAN_IDLE_TIMEOUT_MS_LEFT : SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+#if DT_HAS_CHOSEN(scyan_display_layout)
+    return DT_PROP_OR(CHOSEN_ACTIVE_LAYOUT, idle_timeout_ms, 10000);
 #else
-    return SCYAN_IDLE_TIMEOUT_MS_RIGHT;
+    return 10000;
 #endif
 }
 
 static int engine_get_rotation_for_half(void) {
-#if IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_1)
-    return SCYAN_ROTATION_LEFT;
-#elif IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO) || !defined(CONFIG_SCYAN_DISPLAY_SLOT)
-#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
-    if (engine_is_secondary_peripheral()) {
-        return SCYAN_ROTATION_RIGHT;
-    }
-#endif
-    return engine_is_left_display() ? SCYAN_ROTATION_LEFT : SCYAN_ROTATION_RIGHT;
+#if DT_HAS_CHOSEN(scyan_display_layout)
+    return DT_PROP_OR(CHOSEN_ACTIVE_LAYOUT, rotation, 90);
 #else
-    return SCYAN_ROTATION_RIGHT;
+    return 90;
 #endif
 }
 
 static void engine_get_layout_blocks(bool show_idle, const struct display_layout_block **blocks_out, size_t *count_out) {
-#if defined(SCYAN_ACTIVE_BLOCKS) && !IS_ENABLED(CONFIG_SCYAN_DISPLAY_SLOT_AUTO)
-    *blocks_out = show_idle ? SCYAN_IDLE_BLOCKS : SCYAN_ACTIVE_BLOCKS;
-    *count_out  = show_idle ? SCYAN_IDLE_COUNT  : SCYAN_ACTIVE_COUNT;
-#else
-#if defined(LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS)
-    if (engine_is_secondary_peripheral()) {
-        *blocks_out = show_idle ? LAYOUT_PERIPHERAL_2_IDLE_BLOCKS : LAYOUT_PERIPHERAL_2_ACTIVE_BLOCKS;
-        *count_out  = show_idle ? LAYOUT_PERIPHERAL_2_IDLE_COUNT  : LAYOUT_PERIPHERAL_2_ACTIVE_COUNT;
+#if DT_HAS_CHOSEN(scyan_display_layout)
+#if DT_NODE_HAS_PROP(CHOSEN_ACTIVE_LAYOUT, idle_layout)
+    if (show_idle) {
+        *blocks_out = chosen_idle_blocks;
+        *count_out  = CHOSEN_IDLE_COUNT;
         return;
     }
 #endif
-    if (engine_is_left_display()) {
-        *blocks_out = show_idle ? LAYOUT_LEFT_IDLE_BLOCKS : LAYOUT_LEFT_ACTIVE_BLOCKS;
-        *count_out  = show_idle ? LAYOUT_LEFT_IDLE_COUNT  : LAYOUT_LEFT_ACTIVE_COUNT;
-    } else {
-        *blocks_out = show_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
-        *count_out  = show_idle ? LAYOUT_RIGHT_IDLE_COUNT  : LAYOUT_RIGHT_ACTIVE_COUNT;
-    }
+    (void)show_idle;
+    *blocks_out = chosen_active_blocks;
+    *count_out  = CHOSEN_ACTIVE_COUNT;
+#else
+    (void)show_idle;
+    *blocks_out = NULL;
+    *count_out  = 0;
 #endif
 }
 
@@ -133,8 +173,8 @@ static void engine_render(const struct custom_status_state *state) {
     bool idle_enabled = engine_idle_screens_enabled_for_half();
     bool show_idle = state->is_idle && idle_enabled;
 
-    const struct display_layout_block *blocks;
-    size_t count;
+    const struct display_layout_block *blocks = NULL;
+    size_t count = 0;
     engine_get_layout_blocks(show_idle, &blocks, &count);
 
     for (size_t i = 0; i < count; i++) {
@@ -158,19 +198,12 @@ void engine_update_state(struct custom_status_state state) {
 }
 
 static uint16_t engine_get_active_loop_speed(bool is_idle) {
-    bool is_central = engine_is_left_display();
     bool idle_enabled = engine_idle_screens_enabled_for_half();
     bool effective_idle = is_idle && idle_enabled;
 
-    const struct display_layout_block *blocks;
-    size_t count;
-    if (is_central) {
-        blocks = effective_idle ? LAYOUT_LEFT_IDLE_BLOCKS : LAYOUT_LEFT_ACTIVE_BLOCKS;
-        count = effective_idle ? LAYOUT_LEFT_IDLE_COUNT : LAYOUT_LEFT_ACTIVE_COUNT;
-    } else {
-        blocks = effective_idle ? LAYOUT_RIGHT_IDLE_BLOCKS : LAYOUT_RIGHT_ACTIVE_BLOCKS;
-        count = effective_idle ? LAYOUT_RIGHT_IDLE_COUNT : LAYOUT_RIGHT_ACTIVE_COUNT;
-    }
+    const struct display_layout_block *blocks = NULL;
+    size_t count = 0;
+    engine_get_layout_blocks(effective_idle, &blocks, &count);
 
     uint16_t min_speed = 0;
     for (size_t i = 0; i < count; i++) {
@@ -200,6 +233,24 @@ uint32_t engine_get_loop_tick(void) {
     return loop_ticker_state;
 }
 
+static struct k_work_delayable wpm_ticker_work;
+
+bool engine_has_wpm_chart(bool is_idle) {
+    bool idle_enabled = engine_idle_screens_enabled_for_half();
+    bool effective_idle = is_idle && idle_enabled;
+
+    const struct display_layout_block *blocks = NULL;
+    size_t count = 0;
+    engine_get_layout_blocks(effective_idle, &blocks, &count);
+
+    for (size_t i = 0; i < count; i++) {
+        if (blocks[i].enabled && blocks[i].type == WIDGET_TYPE_WPM_CHART) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void idle_work_cb(struct k_work *work) {
     if (!engine_idle_screens_enabled_for_half()) {
         return;
@@ -213,6 +264,11 @@ static void idle_work_cb(struct k_work *work) {
             k_work_reschedule(&loop_ticker_work, K_MSEC(idle_speed));
         } else {
             k_work_cancel_delayable(&loop_ticker_work);
+        }
+        if (engine_has_wpm_chart(true)) {
+            k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
+        } else {
+            k_work_cancel_delayable(&wpm_ticker_work);
         }
     }
 }
@@ -228,10 +284,9 @@ static void bongo_idle_work_cb(struct k_work *work) {
 }
 
 static uint8_t wpm_ticker_state = 0;
-static struct k_work_delayable wpm_ticker_work;
 
 static void wpm_ticker_work_cb(struct k_work *work) {
-    if (!is_screen_idle) {
+    if (engine_has_wpm_chart(is_screen_idle)) {
         wpm_ticker_state++;
         widget_wpm_tick(last_rendered_state.wpm);
         engine_trigger_refresh();
@@ -262,7 +317,11 @@ void engine_notify_activity(void) {
         is_screen_idle = false;
         loop_ticker_state = 0;
         engine_trigger_refresh();
-        k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
+        if (engine_has_wpm_chart(false)) {
+            k_work_reschedule(&wpm_ticker_work, K_MSEC(1000));
+        } else {
+            k_work_cancel_delayable(&wpm_ticker_work);
+        }
         uint16_t active_speed = engine_get_active_loop_speed(false);
         if (active_speed > 0) {
             k_work_reschedule(&loop_ticker_work, K_MSEC(active_speed));
@@ -286,6 +345,29 @@ void engine_set_idle(bool idle) {
     is_screen_idle = idle;
 }
 
+static uint16_t keypress_counter = 0;
+static struct k_work_delayable typewriter_cleaning_work;
+
+static void typewriter_cleaning_work_cb(struct k_work *work) {
+    (void)work;
+    keypress_counter++;
+    engine_trigger_refresh();
+}
+
+uint16_t engine_get_keypress_count(void) {
+    return keypress_counter;
+}
+
+void engine_increment_keypress_count(void) {
+    keypress_counter++;
+}
+
+void engine_schedule_typewriter_cleaning(uint32_t delay_ms) {
+    if (delay_ms > 0) {
+        k_work_reschedule(&typewriter_cleaning_work, K_MSEC(delay_ms));
+    }
+}
+
 void engine_init(lv_obj_t *canvas_obj) {
     engine_canvas_obj = canvas_obj;
     state_has_rendered = false;
@@ -293,6 +375,9 @@ void engine_init(lv_obj_t *canvas_obj) {
     current_bongo_state = 0;
     wpm_ticker_state = 0;
     loop_ticker_state = 0;
+    keypress_counter = 0;
+
+    k_work_init_delayable(&typewriter_cleaning_work, typewriter_cleaning_work_cb);
 
     k_work_init_delayable(&idle_work, idle_work_cb);
     if (engine_idle_screens_enabled_for_half()) {
@@ -304,7 +389,9 @@ void engine_init(lv_obj_t *canvas_obj) {
 
     k_work_init_delayable(&bongo_idle_work, bongo_idle_work_cb);
     k_work_init_delayable(&wpm_ticker_work, wpm_ticker_work_cb);
-    k_work_schedule(&wpm_ticker_work, K_MSEC(1000));
+    if (engine_has_wpm_chart(false)) {
+        k_work_schedule(&wpm_ticker_work, K_MSEC(1000));
+    }
 
     k_work_init_delayable(&loop_ticker_work, loop_ticker_work_cb);
     uint16_t init_loop_speed = engine_get_active_loop_speed(false);
@@ -312,4 +399,3 @@ void engine_init(lv_obj_t *canvas_obj) {
         k_work_schedule(&loop_ticker_work, K_MSEC(init_loop_speed));
     }
 }
-

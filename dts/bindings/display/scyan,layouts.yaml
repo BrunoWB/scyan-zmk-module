@@ -1,0 +1,5 @@
+# Copyright (c) 2026 Bruno Barcellos
+# SPDX-License-Identifier: MIT
+
+description: "Scyan display layouts root container"
+compatible: "scyan,layouts"

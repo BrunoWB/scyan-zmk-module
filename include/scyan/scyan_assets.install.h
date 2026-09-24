@@ -11,62 +11,61 @@
 #define DISPLAY_HW_WIDTH       128
 #define DISPLAY_HW_HEIGHT      32
 
+/* Symbol identifiers */
+#define SYMBOL_USB 0
+#define SYMBOL_BATTERY_FRAME 1
+#define SYMBOL_SPLIT_CONNECTED 2
+#define SYMBOL_SPLIT_DISCONNECTED 3
+#define SYMBOL_BRACKET_LAYER_0 4
+#define SYMBOL_BRACKET_LAYER_1 5
+#define SYMBOL_BRACKET_LAYER_2 6
+#define SYMBOL_BRACKET_LAYER_3 7
+#define SYMBOL_SKULL_LAYER_0 8
+#define SYMBOL_BLUETOOTH_9659 9
+#define SYMBOL_BLUETOOTH_9659_SUB_1 10
+#define SYMBOL_BLUETOOTH_9659_SUB_2 11
+#define SYMBOL_BLUETOOTH_9659_SUB_3 12
+#define SYMBOL_BLUETOOTH_9659_SUB_4 13
+#define SYMBOL_BLUETOOTH_9659_SUB_5 14
+#define SYMBOL_CHARGE_0960 15
+#define SYMBOL_CHARGE_0960_SUB_1 16
+#define SYMBOL_CHARGE_0960_SUB_2 17
+#define SYMBOL_CHARGE_0960_SUB_3 18
+#define SYMBOL_CHARGE_0960_SUB_4 19
+#define SYMBOL_CHARGE_0960_SUB_5 20
+#define SYMBOL_CHARGE_0960_SUB_6 21
+#define SYMBOL_CHARGE_0960_SUB_7 22
+#define SYMBOL_CHARGE_0960_SUB_8 23
+#define SYMBOL_CHARGE_0960_SUB_9 24
+#define SYMBOL_CHARGE_0960_SUB_10 25
+#define SYMBOL_CHARGE_0960_SUB_11 26
+#define SYMBOL_CHARGE_0960_SUB_12 27
+#define SYMBOL_SPEEDOMETER_8803 28
+#define SYMBOL_SPEEDOMETER_8803_SUB_1 29
+#define SYMBOL_SPEEDOMETER_8803_SUB_2 30
+#define SYMBOL_SPEEDOMETER_8803_SUB_3 31
+#define SYMBOL_SPEEDOMETER_8803_SUB_4 32
+#define SYMBOL_SPEEDOMETER_8803_SUB_5 33
+#define SYMBOL_SPEEDOMETER_8803_SUB_6 34
+#define SYMBOL_SPEEDOMETER_8803_SUB_7 35
+#define SYMBOL_CAPSA_9310 36
+#define SYMBOL_CAPSA_9310_SUB_1 37
+#define SYMBOL_IMPORT_TEST_9202 38
+#define SYMBOL_SLICE_40_4046 39
+#define SYMBOL_SLICE_40_4046_SUB_1 40
+#define SYMBOL_SLICE_40_4046_SUB_2 41
+#define SYMBOL_BONGO_SCYAN_5477 42
+#define SYMBOL_BONGO_SCYAN_5477_SUB_1 43
+#define SYMBOL_BONGO_SCYAN_5477_SUB_2 44
+#define SYMBOL_COUNT 45
+
+#if !defined(_ASMLANGUAGE) && !defined(__DTS__)
 /* Sprite slice descriptor */
 struct sprite_slice {
     uint16_t x;
     uint16_t y;
     uint16_t width;
     uint16_t height;
-};
-
-/* Symbol identifiers */
-enum symbol_id {
-    SYMBOL_USB,
-    SYMBOL_BATTERY_FRAME,
-    SYMBOL_SPLIT_CONNECTED,
-    SYMBOL_SPLIT_DISCONNECTED,
-    SYMBOL_BRACKET_LAYER_0,
-    SYMBOL_BRACKET_LAYER_1,
-    SYMBOL_BRACKET_LAYER_2,
-    SYMBOL_BRACKET_LAYER_3,
-    SYMBOL_SKULL_LAYER_0,
-    SYMBOL_BLUETOOTH_9659,
-    SYMBOL_BLUETOOTH_9659_SUB_1,
-    SYMBOL_BLUETOOTH_9659_SUB_2,
-    SYMBOL_BLUETOOTH_9659_SUB_3,
-    SYMBOL_BLUETOOTH_9659_SUB_4,
-    SYMBOL_BLUETOOTH_9659_SUB_5,
-    SYMBOL_CHARGE_0960,
-    SYMBOL_CHARGE_0960_SUB_1,
-    SYMBOL_CHARGE_0960_SUB_2,
-    SYMBOL_CHARGE_0960_SUB_3,
-    SYMBOL_CHARGE_0960_SUB_4,
-    SYMBOL_CHARGE_0960_SUB_5,
-    SYMBOL_CHARGE_0960_SUB_6,
-    SYMBOL_CHARGE_0960_SUB_7,
-    SYMBOL_CHARGE_0960_SUB_8,
-    SYMBOL_CHARGE_0960_SUB_9,
-    SYMBOL_CHARGE_0960_SUB_10,
-    SYMBOL_CHARGE_0960_SUB_11,
-    SYMBOL_CHARGE_0960_SUB_12,
-    SYMBOL_SPEEDOMETER_8803,
-    SYMBOL_SPEEDOMETER_8803_SUB_1,
-    SYMBOL_SPEEDOMETER_8803_SUB_2,
-    SYMBOL_SPEEDOMETER_8803_SUB_3,
-    SYMBOL_SPEEDOMETER_8803_SUB_4,
-    SYMBOL_SPEEDOMETER_8803_SUB_5,
-    SYMBOL_SPEEDOMETER_8803_SUB_6,
-    SYMBOL_SPEEDOMETER_8803_SUB_7,
-    SYMBOL_CAPSA_9310,
-    SYMBOL_CAPSA_9310_SUB_1,
-    SYMBOL_IMPORT_TEST_9202,
-    SYMBOL_SLICE_40_4046,
-    SYMBOL_SLICE_40_4046_SUB_1,
-    SYMBOL_SLICE_40_4046_SUB_2,
-    SYMBOL_BONGO_SCYAN_5477,
-    SYMBOL_BONGO_SCYAN_5477_SUB_1,
-    SYMBOL_BONGO_SCYAN_5477_SUB_2,
-    SYMBOL_COUNT,
 };
 
 /* Spritesheet 1: Symbols & Icons Atlas (224x208, 1bpp, 28 bytes stride) */
@@ -714,108 +713,7 @@ static const struct display_font font_default = {
     .space_advance = 3,
 };
 
-/* Interactive Screen Layout & Widget Architecture */
-#define HAS_CUSTOM_LAYOUT_BLOCKS 1
-
-enum display_widget_type {
-    WIDGET_TYPE_NONE = 0,
-    WIDGET_TYPE_OUTPUT_STATUS,
-    WIDGET_TYPE_BATTERY,
-    WIDGET_TYPE_LAYER,
-    WIDGET_TYPE_WPM,
-    WIDGET_TYPE_WPM_CHART,
-    WIDGET_TYPE_BRANDING,
-    WIDGET_TYPE_SPLIT,
-    WIDGET_TYPE_SCREENSAVER,
-    WIDGET_TYPE_CAPS_LOCK,
-    WIDGET_TYPE_BONGO,
-};
-
-#define MAX_BLOCK_SYMBOLS 16
-#define MAX_BLOCK_TEXTS 16
-
-struct display_layout_block {
-    uint8_t type;
-    int16_t x;
-    int16_t y;
-    uint8_t width;
-    uint8_t height;
-    bool enabled;
-    uint8_t mode;
-    int16_t param1;
-    int16_t param2;
-    int16_t param3;
-    uint8_t symbol_count;
-    uint16_t symbol_ids[MAX_BLOCK_SYMBOLS];
-    uint8_t text_count;
-    const char *text_entries[MAX_BLOCK_TEXTS];
-    const char *custom_text;
-    uint16_t symbol_id;
-};
-
-static const struct display_layout_block LAYOUT_LEFT_ACTIVE_BLOCKS[9] = {
-    { .type = WIDGET_TYPE_OUTPUT_STATUS, .x = 0, .y = 12, .width = 12, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 1, .symbol_ids = { SYMBOL_USB }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_USB },
-    { .type = WIDGET_TYPE_BATTERY, .x = 0, .y = 1, .width = 17, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 14, .symbol_ids = { SYMBOL_CHARGE_0960, SYMBOL_CHARGE_0960_SUB_1, SYMBOL_CHARGE_0960_SUB_2, SYMBOL_CHARGE_0960_SUB_3, SYMBOL_CHARGE_0960_SUB_4, SYMBOL_CHARGE_0960_SUB_5, SYMBOL_CHARGE_0960_SUB_6, SYMBOL_CHARGE_0960_SUB_7, SYMBOL_CHARGE_0960_SUB_8, SYMBOL_CHARGE_0960_SUB_9, SYMBOL_CHARGE_0960_SUB_10, SYMBOL_CHARGE_0960_SUB_11, SYMBOL_CHARGE_0960_SUB_12, SYMBOL_BATTERY_FRAME }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_CHARGE_0960 },
-    { .type = WIDGET_TYPE_LAYER, .x = 0, .y = 24, .width = 24, .height = 12, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 4, .symbol_ids = { SYMBOL_BRACKET_LAYER_0, SYMBOL_BRACKET_LAYER_1, SYMBOL_BRACKET_LAYER_2, SYMBOL_BRACKET_LAYER_3 }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_BRACKET_LAYER_0 },
-    { .type = WIDGET_TYPE_WPM, .x = 0, .y = 79, .width = 27, .height = 5, .enabled = true, .mode = 0, .param1 = 0, .param2 = 100, .param3 = 0, .symbol_count = 8, .symbol_ids = { SYMBOL_SPEEDOMETER_8803, SYMBOL_SPEEDOMETER_8803_SUB_1, SYMBOL_SPEEDOMETER_8803_SUB_2, SYMBOL_SPEEDOMETER_8803_SUB_3, SYMBOL_SPEEDOMETER_8803_SUB_4, SYMBOL_SPEEDOMETER_8803_SUB_5, SYMBOL_SPEEDOMETER_8803_SUB_6, SYMBOL_SPEEDOMETER_8803_SUB_7 }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_SPEEDOMETER_8803 },
-    { .type = WIDGET_TYPE_SPLIT, .x = 9, .y = 94, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 2, .symbol_ids = { SYMBOL_SPLIT_CONNECTED, SYMBOL_SPLIT_DISCONNECTED }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
-    { .type = WIDGET_TYPE_LAYER, .x = 0, .y = 36, .width = 26, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 2, .symbol_ids = { SYMBOL_SKULL_LAYER_0, SYMBOL_BRACKET_LAYER_3 }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_SKULL_LAYER_0 },
-    { .type = WIDGET_TYPE_WPM, .x = 0, .y = 67, .width = 24, .height = 10, .enabled = true, .mode = 1, .param1 = 0, .param2 = 60, .param3 = 0, .symbol_count = 8, .symbol_ids = { SYMBOL_SPEEDOMETER_8803, SYMBOL_SPEEDOMETER_8803_SUB_1, SYMBOL_SPEEDOMETER_8803_SUB_2, SYMBOL_SPEEDOMETER_8803_SUB_3, SYMBOL_SPEEDOMETER_8803_SUB_4, SYMBOL_SPEEDOMETER_8803_SUB_5, SYMBOL_SPEEDOMETER_8803_SUB_6, SYMBOL_SPEEDOMETER_8803_SUB_7 }, .text_count = 1, .text_entries = { "A" }, .custom_text = "A", .symbol_id = SYMBOL_SPEEDOMETER_8803 },
-    { .type = WIDGET_TYPE_BRANDING, .x = 0, .y = 86, .width = 25, .height = 5, .enabled = true, .mode = 1, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 1, .symbol_ids = { SYMBOL_USB }, .text_count = 1, .text_entries = { "Scyan" }, .custom_text = "Scyan", .symbol_id = SYMBOL_USB },
-    { .type = WIDGET_TYPE_SCREENSAVER, .x = 0, .y = 99, .width = 31, .height = 29, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 1, .symbol_ids = { SYMBOL_SKULL_LAYER_0 }, .text_count = 1, .text_entries = { "Scyan" }, .custom_text = "Scyan", .symbol_id = SYMBOL_SKULL_LAYER_0 },
-};
-#define LAYOUT_LEFT_ACTIVE_COUNT 9
-
-static const struct display_layout_block LAYOUT_LEFT_IDLE_BLOCKS[2] = {
-    { .type = WIDGET_TYPE_BRANDING, .x = 2, .y = 72, .width = 25, .height = 5, .enabled = true, .mode = 1, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 1, .symbol_ids = { SYMBOL_USB }, .text_count = 1, .text_entries = { "Scyan" }, .custom_text = "Scyan", .symbol_id = SYMBOL_USB },
-    { .type = WIDGET_TYPE_SCREENSAVER, .x = 0, .y = 36, .width = 26, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 1, .symbol_ids = { SYMBOL_SKULL_LAYER_0 }, .text_count = 1, .text_entries = { "Scyan" }, .custom_text = "Scyan", .symbol_id = SYMBOL_SKULL_LAYER_0 },
-};
-#define LAYOUT_LEFT_IDLE_COUNT 2
-
-static const struct display_layout_block LAYOUT_RIGHT_ACTIVE_BLOCKS[6] = {
-    { .type = WIDGET_TYPE_BATTERY, .x = 0, .y = 0, .width = 17, .height = 10, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 14, .symbol_ids = { SYMBOL_CHARGE_0960, SYMBOL_CHARGE_0960_SUB_1, SYMBOL_CHARGE_0960_SUB_2, SYMBOL_CHARGE_0960_SUB_3, SYMBOL_CHARGE_0960_SUB_4, SYMBOL_CHARGE_0960_SUB_5, SYMBOL_CHARGE_0960_SUB_6, SYMBOL_CHARGE_0960_SUB_7, SYMBOL_CHARGE_0960_SUB_8, SYMBOL_CHARGE_0960_SUB_9, SYMBOL_CHARGE_0960_SUB_10, SYMBOL_CHARGE_0960_SUB_11, SYMBOL_CHARGE_0960_SUB_12, SYMBOL_BATTERY_FRAME }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_CHARGE_0960 },
-    { .type = WIDGET_TYPE_SPLIT, .x = 0, .y = 29, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 2, .symbol_ids = { SYMBOL_SPLIT_CONNECTED, SYMBOL_SPLIT_DISCONNECTED }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
-    { .type = WIDGET_TYPE_BATTERY, .x = 0, .y = 15, .width = 17, .height = 10, .enabled = true, .mode = 1, .param1 = 10, .param2 = 0, .param3 = 0, .symbol_count = 14, .symbol_ids = { SYMBOL_BATTERY_FRAME, SYMBOL_CHARGE_0960, SYMBOL_CHARGE_0960_SUB_1, SYMBOL_CHARGE_0960_SUB_2, SYMBOL_CHARGE_0960_SUB_3, SYMBOL_CHARGE_0960_SUB_4, SYMBOL_CHARGE_0960_SUB_5, SYMBOL_CHARGE_0960_SUB_6, SYMBOL_CHARGE_0960_SUB_7, SYMBOL_CHARGE_0960_SUB_8, SYMBOL_CHARGE_0960_SUB_9, SYMBOL_CHARGE_0960_SUB_10, SYMBOL_CHARGE_0960_SUB_11, SYMBOL_CHARGE_0960_SUB_12 }, .text_count = 10, .text_entries = { "1!", "2!", "3!", "4", "5", "6", "7", "8", "9", "10" }, .custom_text = "1!", .symbol_id = SYMBOL_BATTERY_FRAME },
-    { .type = WIDGET_TYPE_WPM_CHART, .x = 0, .y = 76, .width = 24, .height = 21, .enabled = true, .mode = 0, .param1 = 7, .param2 = 60, .param3 = 30, .symbol_count = 1, .symbol_ids = { SYMBOL_USB }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_USB },
-    { .type = WIDGET_TYPE_BONGO, .x = 0, .y = 46, .width = 32, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 3, .symbol_ids = { SYMBOL_SLICE_40_4046, SYMBOL_SLICE_40_4046_SUB_1, SYMBOL_SLICE_40_4046_SUB_2 }, .text_count = 1, .text_entries = { "(=^.^=)" }, .custom_text = "(=^.^=)", .symbol_id = SYMBOL_SLICE_40_4046 },
-    { .type = WIDGET_TYPE_BONGO, .x = 0, .y = 104, .width = 32, .height = 23, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 3, .symbol_ids = { SYMBOL_SLICE_40_4046, SYMBOL_SLICE_40_4046_SUB_1, SYMBOL_SLICE_40_4046_SUB_2 }, .text_count = 1, .text_entries = { "(=^.^=)" }, .custom_text = "(=^.^=)", .symbol_id = SYMBOL_SLICE_40_4046 },
-};
-#define LAYOUT_RIGHT_ACTIVE_COUNT 6
-
-static const struct display_layout_block LAYOUT_RIGHT_IDLE_BLOCKS[1] = {
-    { .type = WIDGET_TYPE_SPLIT, .x = 9, .y = 61, .width = 13, .height = 9, .enabled = true, .mode = 0, .param1 = 0, .param2 = 0, .param3 = 0, .symbol_count = 2, .symbol_ids = { SYMBOL_SPLIT_CONNECTED, SYMBOL_SPLIT_DISCONNECTED }, .text_count = 0, .text_entries = { NULL }, .custom_text = NULL, .symbol_id = SYMBOL_SPLIT_CONNECTED },
-};
-#define LAYOUT_RIGHT_IDLE_COUNT 1
-
-#ifndef LAYOUT_DISPLAY_1_ACTIVE_BLOCKS
-#define LAYOUT_DISPLAY_1_ACTIVE_BLOCKS LAYOUT_LEFT_ACTIVE_BLOCKS
-#define LAYOUT_DISPLAY_1_ACTIVE_COUNT  LAYOUT_LEFT_ACTIVE_COUNT
-#define LAYOUT_DISPLAY_1_IDLE_BLOCKS   LAYOUT_LEFT_IDLE_BLOCKS
-#define LAYOUT_DISPLAY_1_IDLE_COUNT    LAYOUT_LEFT_IDLE_COUNT
-#endif
-
-#ifndef LAYOUT_DISPLAY_2_ACTIVE_BLOCKS
-#define LAYOUT_DISPLAY_2_ACTIVE_BLOCKS LAYOUT_RIGHT_ACTIVE_BLOCKS
-#define LAYOUT_DISPLAY_2_ACTIVE_COUNT  LAYOUT_RIGHT_ACTIVE_COUNT
-#define LAYOUT_DISPLAY_2_IDLE_BLOCKS   LAYOUT_RIGHT_IDLE_BLOCKS
-#define LAYOUT_DISPLAY_2_IDLE_COUNT    LAYOUT_RIGHT_IDLE_COUNT
-#endif
-
-#ifndef SCYAN_ACTIVE_BLOCKS
-#if defined(CONFIG_SCYAN_DISPLAY_SLOT_2)
-#define SCYAN_ACTIVE_BLOCKS LAYOUT_DISPLAY_2_ACTIVE_BLOCKS
-#define SCYAN_ACTIVE_COUNT  LAYOUT_DISPLAY_2_ACTIVE_COUNT
-#define SCYAN_IDLE_BLOCKS   LAYOUT_DISPLAY_2_IDLE_BLOCKS
-#define SCYAN_IDLE_COUNT    LAYOUT_DISPLAY_2_IDLE_COUNT
-#elif defined(CONFIG_SCYAN_DISPLAY_SLOT_1)
-#define SCYAN_ACTIVE_BLOCKS LAYOUT_DISPLAY_1_ACTIVE_BLOCKS
-#define SCYAN_ACTIVE_COUNT  LAYOUT_DISPLAY_1_ACTIVE_COUNT
-#define SCYAN_IDLE_BLOCKS   LAYOUT_DISPLAY_1_IDLE_BLOCKS
-#define SCYAN_IDLE_COUNT    LAYOUT_DISPLAY_1_IDLE_COUNT
-#endif
-#endif
-
-
+#endif /* !defined(_ASMLANGUAGE) && !defined(__DTS__) */
 
 /* ZMK_DISPLAY_STUDIO_METADATA
 {

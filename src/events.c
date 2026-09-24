@@ -10,15 +10,19 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/display.h>
 #include <zmk/event_manager.h>
-#if IS_ENABLED(CONFIG_ZMK_BATTERY)
+#if IS_ENABLED(CONFIG_SCYAN_WIDGET_BATTERY) && IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/battery.h>
 #endif
 #include <zmk/events/endpoint_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/events/position_state_changed.h>
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include <zmk/events/keycode_state_changed.h>
+#endif
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
+#include "widgets/widgets.h"
 
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
 #include <zmk/usb.h>
@@ -91,7 +95,7 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
     memset(&s, 0, sizeof(s));
 
     // Battery status
-#if IS_ENABLED(CONFIG_ZMK_BATTERY)
+#if IS_ENABLED(CONFIG_SCYAN_WIDGET_BATTERY) && IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
     const struct zmk_battery_state_changed *batt_ev = as_zmk_battery_state_changed(eh);
     s.battery_level = (batt_ev != NULL) ? batt_ev->state_of_charge : zmk_battery_state_of_charge();
 #else
@@ -166,6 +170,7 @@ static struct custom_status_state events_get_current_state(const zmk_event_t *eh
     s.bongo_state = engine_get_bongo_state();
     s.wpm_tick = engine_get_wpm_tick();
     s.loop_tick = engine_get_loop_tick();
+    s.keypress_count = engine_get_keypress_count();
     return s;
 }
 
@@ -176,7 +181,7 @@ static void update_cb(struct custom_status_state state) {
 ZMK_DISPLAY_WIDGET_LISTENER(scyan_status_listener, struct custom_status_state,
                             update_cb, events_get_current_state)
 
-#if IS_ENABLED(CONFIG_ZMK_BATTERY)
+#if IS_ENABLED(CONFIG_SCYAN_WIDGET_BATTERY) && IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
 ZMK_SUBSCRIPTION(scyan_status_listener, zmk_battery_state_changed);
 #endif
 
@@ -207,26 +212,31 @@ static int custom_activity_listener_cb(const zmk_event_t *eh) {
     const struct zmk_position_state_changed *pos_ev = as_zmk_position_state_changed(eh);
     if (pos_ev != NULL) {
         engine_notify_activity();
+
+        // Determine whether the key is from Left or Right side
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT)
+        // Unibody or middle topology: alternate paws from last tapped paw
+        static bool unibody_last_paw = false;
+        bool is_left = !unibody_last_paw;
+        unibody_last_paw = is_left;
+#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+        bool is_local = (pos_ev->source == ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL);
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
+        bool is_left = is_local;
+#else
+        bool is_left = !is_local;
+#endif
+#else
+        // Peripheral half only receives its own local keystrokes
+#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
+        bool is_left = false;
+#else
+        bool is_left = true;
+#endif
+#endif
+
         if (pos_ev->state) {
             events_record_keystroke();
-            // Determine whether the key is from Left or Right side
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT)
-            bool is_left = (pos_ev->position < 21);
-#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-            bool is_local = (pos_ev->source == ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL);
-#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-            bool is_left = is_local;
-#else
-            bool is_left = !is_local;
-#endif
-#else
-            // Peripheral half only receives its own local keystrokes
-#if IS_ENABLED(CONFIG_SCYAN_LEFT_IS_CENTRAL)
-            bool is_left = false;
-#else
-            bool is_left = true;
-#endif
-#endif
             engine_bongo_tap(is_left);
         }
     }
@@ -234,6 +244,27 @@ static int custom_activity_listener_cb(const zmk_event_t *eh) {
 }
 ZMK_LISTENER(custom_activity_listener, custom_activity_listener_cb);
 ZMK_SUBSCRIPTION(custom_activity_listener, zmk_position_state_changed);
+
+#if (IS_ENABLED(CONFIG_SCYAN_WIDGET_TYPEWRITER) || IS_ENABLED(CONFIG_SCYAN_WIDGET_KEYPRESS)) && (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
+static int custom_keycode_listener_cb(const zmk_event_t *eh) {
+    const struct zmk_keycode_state_changed *kc_ev = as_zmk_keycode_state_changed(eh);
+    if (kc_ev != NULL) {
+#if IS_ENABLED(CONFIG_SCYAN_WIDGET_TYPEWRITER)
+        if (kc_ev->state) {
+            widget_typewriter_record_key(kc_ev->usage_page, kc_ev->keycode, kc_ev->state);
+        }
+#endif
+#if IS_ENABLED(CONFIG_SCYAN_WIDGET_KEYPRESS)
+        widget_keypress_record_key(kc_ev->usage_page, kc_ev->keycode, kc_ev->state);
+#endif
+        engine_increment_keypress_count();
+        engine_trigger_refresh();
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+ZMK_LISTENER(custom_keycode_listener, custom_keycode_listener_cb);
+ZMK_SUBSCRIPTION(custom_keycode_listener, zmk_keycode_state_changed);
+#endif
 
 #if IS_ENABLED(CONFIG_ZMK_BLE) && (!IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL))
 static void split_conn_cb(struct bt_conn *conn, uint8_t err) {

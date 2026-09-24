@@ -30,9 +30,9 @@ void widget_render_layer(const struct display_layout_block *b, const struct cust
         // Symbol / Icon mode
         if (b->symbol_count > 0) {
             uint8_t idx = layer % b->symbol_count;
-            canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
-        } else if (b->symbol_id != 0) {
-            canvas_draw_symbol(b->x, b->y, b->symbol_id);
+            if (idx < MAX_BLOCK_SYMBOLS) {
+                canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
+            }
         } else {
             char buf[16];
             snprintf(buf, sizeof(buf), "L%d", layer);

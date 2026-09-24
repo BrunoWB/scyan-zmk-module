@@ -35,49 +35,6 @@ config SCYAN_IDLE_TIMEOUT_MS
     help
       Duration of key inactivity in milliseconds before transitioning to the idle screen layout.
 
-config SCYAN_LEFT_IS_CENTRAL
-    bool "Map Left screen blocks to Central split role"
-    default y
-    help
-      When enabled, the split Central half renders LAYOUT_LEFT_* blocks and Peripheral renders
-      LAYOUT_RIGHT_* blocks. When disabled, Central renders LAYOUT_RIGHT_* and Peripheral renders LAYOUT_LEFT_*.
-
-choice SCYAN_DISPLAY_SLOT
-    prompt "Display Layout Slot Selection"
-    default SCYAN_DISPLAY_SLOT_AUTO
-    help
-      Select which slotted display layout this firmware image should render.
-
-config SCYAN_DISPLAY_SLOT_AUTO
-    bool "Automatic (Central -> Display 1, Peripheral -> Display 2)"
-
-config SCYAN_DISPLAY_SLOT_1
-    bool "Display Slot 1 (Primary / Central / Left)"
-
-config SCYAN_DISPLAY_SLOT_2
-    bool "Display Slot 2 (Secondary / Peripheral / Right)"
-
-config SCYAN_DISPLAY_SLOT_3
-    bool "Display Slot 3 (Tertiary / Peripheral 2)"
-
-config SCYAN_DISPLAY_SLOT_4
-    bool "Display Slot 4 (Quaternary / Auxiliary)"
-
-config SCYAN_DISPLAY_SLOT_5
-    bool "Display Slot 5"
-
-config SCYAN_DISPLAY_SLOT_6
-    bool "Display Slot 6"
-
-endchoice
-
-config SCYAN_PERIPHERAL_SLOT_2
-    bool "Secondary peripheral display layout (Legacy alias for Slot 3)"
-    default n
-    help
-      When enabled on a peripheral half in a multi-peripheral setup, the display renders
-      LAYOUT_PERIPHERAL_2_* blocks instead of standard LAYOUT_PERIPHERAL_* blocks.
-
 config SCYAN_USER_NAME
     string "Default branding user name"
     default "SCYAN"
@@ -90,5 +47,77 @@ config SCYAN_BONGO_TAP_MS
     help
       Duration in milliseconds that Bongo Cat holds a paw down before returning to neutral.
 
-endmenu
+config SCYAN_LEFT_IS_CENTRAL
+    bool "Central split half is the left side"
+    default y
+    help
+      Set to y if the Central (master) keyboard half is the left split part.
+      Set to n if the Central half is the right split part.
 
+DT_COMPAT_SCYAN_WIDGET_OUTPUT := scyan,widget-output
+DT_COMPAT_SCYAN_WIDGET_BATTERY := scyan,widget-battery
+DT_COMPAT_SCYAN_WIDGET_LAYER := scyan,widget-layer
+DT_COMPAT_SCYAN_WIDGET_WPM := scyan,widget-wpm
+DT_COMPAT_SCYAN_WIDGET_WPM_CHART := scyan,widget-wpm-chart
+DT_COMPAT_SCYAN_WIDGET_BRANDING := scyan,widget-branding
+DT_COMPAT_SCYAN_WIDGET_SPLIT := scyan,widget-split
+DT_COMPAT_SCYAN_WIDGET_SCREENSAVER := scyan,widget-screensaver
+DT_COMPAT_SCYAN_WIDGET_CAPS := scyan,widget-caps
+DT_COMPAT_SCYAN_WIDGET_BONGO := scyan,widget-bongo
+DT_COMPAT_SCYAN_WIDGET_LOOP := scyan,widget-loop
+DT_COMPAT_SCYAN_WIDGET_TYPEWRITER := scyan,widget-typewriter
+DT_COMPAT_SCYAN_WIDGET_KEYPRESS := scyan,widget-keypress
+
+config SCYAN_WIDGET_OUTPUT
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_OUTPUT))
+
+config SCYAN_WIDGET_BATTERY
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_BATTERY))
+
+config SCYAN_WIDGET_LAYER
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_LAYER))
+
+config SCYAN_WIDGET_WPM
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_WPM)) || $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_WPM_CHART))
+
+config SCYAN_WIDGET_WPM_CHART
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_WPM_CHART))
+
+config SCYAN_WIDGET_BRANDING
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_BRANDING))
+
+config SCYAN_WIDGET_SPLIT
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_SPLIT))
+
+config SCYAN_WIDGET_SCREENSAVER
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_SCREENSAVER))
+
+config SCYAN_WIDGET_CAPS
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_CAPS))
+
+config SCYAN_WIDGET_BONGO
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_BONGO))
+
+config SCYAN_WIDGET_LOOP
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_LOOP))
+
+config SCYAN_WIDGET_TYPEWRITER
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_TYPEWRITER))
+
+config SCYAN_WIDGET_KEYPRESS
+    bool
+    default $(dt_compat_enabled,$(DT_COMPAT_SCYAN_WIDGET_KEYPRESS))
+
+endmenu

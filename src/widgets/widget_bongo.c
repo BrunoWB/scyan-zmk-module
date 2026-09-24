@@ -19,11 +19,11 @@ void widget_render_bongo(const struct display_layout_block *b, const struct cust
         if (idx >= b->symbol_count) {
             idx = 0;
         }
-        canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
+        if (idx < MAX_BLOCK_SYMBOLS) {
+            canvas_draw_symbol(b->x, b->y, b->symbol_ids[idx]);
+        }
     } else if (b->mode == 0 && b->symbol_count > 0) {
         canvas_draw_symbol(b->x, b->y, b->symbol_ids[0]);
-    } else if (b->mode == 0 && b->symbol_id) {
-        canvas_draw_symbol(b->x, b->y, b->symbol_id);
     } else {
         // Fallback text mode
         const char *txt = (b->text_count > 0 && b->text_entries[0]) ? b->text_entries[0] :
