@@ -457,10 +457,12 @@ void test_loop_widget(void) {
     state.loop_tick = 0;
     canvas_clear();
     widget_dispatch_block(&loop_block, &state);
+    uint8_t buffer_frame0[DISPLAY_VIRTUAL_HEIGHT][DISPLAY_VIRTUAL_WIDTH];
     bool has_pixel = false;
     for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
         for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
-            if (canvas_get_pixel(x, y) == 1) has_pixel = true;
+            buffer_frame0[y][x] = canvas_get_pixel(x, y);
+            if (buffer_frame0[y][x] == 1) has_pixel = true;
         }
     }
     assert(has_pixel);
@@ -546,7 +548,24 @@ void test_loop_widget(void) {
     canvas_clear();
     widget_dispatch_block(&large_anim_block, &state);
 
-    printf("  -> Animation widget (looping, stop-at-last, 32-bit ticks, and 16+ frame fallback via param3) passed successfully.\n");
+    // Test mode = 1 (uptime-synced animation across split screens)
+    struct display_layout_block synced_loop_block = loop_block;
+    synced_loop_block.mode = 1;
+    synced_loop_block.param1 = 200; // 200ms per frame
+    synced_loop_block.symbol_count = 3;
+
+    // At uptime = 100200ms: 100200 / 200 = 501. 501 % 3 = 0 (frame 0)
+    mock_set_uptime(100200);
+    state.loop_tick = 99; // Local loop_tick must be ignored in favor of global uptime
+    canvas_clear();
+    widget_dispatch_block(&synced_loop_block, &state);
+    for (int y = 0; y < DISPLAY_VIRTUAL_HEIGHT; y++) {
+        for (int x = 0; x < DISPLAY_VIRTUAL_WIDTH; x++) {
+            assert(canvas_get_pixel(x, y) == buffer_frame0[y][x]);
+        }
+    }
+
+    printf("  -> Animation widget (looping, stop-at-last, 32-bit ticks, 16+ frame fallback, and uptime sync) passed successfully.\n");
 }
 
 static bool helper_has_pixel_in_rect(int max_x, int max_y) {

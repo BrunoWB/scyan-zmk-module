@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <zephyr/kernel.h>
 #include "widgets.h"
 #include "canvas.h"
 #include "font_renderer.h"
@@ -13,7 +14,17 @@ void widget_render_loop(const struct display_layout_block *b, const struct custo
     uint8_t total_frames = (b->param3 > 0) ? (uint8_t)b->param3 : b->symbol_count;
     if (total_frames > 0) {
         uint8_t idx = 0;
-        if (state) {
+        bool is_synced = (b->mode == 1);
+        if (is_synced) {
+            uint32_t speed = (b->param1 > 0) ? (uint32_t)b->param1 : 250;
+            uint32_t global_tick = k_uptime_get_32() / speed;
+            bool no_loop = (b->param2 == 1);
+            if (no_loop) {
+                idx = (global_tick < total_frames) ? (uint8_t)global_tick : (total_frames - 1);
+            } else {
+                idx = (uint8_t)(global_tick % total_frames);
+            }
+        } else if (state) {
             bool no_loop = (b->param2 == 1);
             if (no_loop) {
                 idx = (state->loop_tick < total_frames) ? (uint8_t)state->loop_tick : (total_frames - 1);
