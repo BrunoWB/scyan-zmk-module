@@ -220,12 +220,19 @@ static uint16_t engine_get_active_loop_speed(bool is_idle) {
 static uint32_t loop_ticker_state = 0;
 static struct k_work_delayable loop_ticker_work;
 
+static inline uint32_t engine_calc_aligned_loop_delay(uint16_t speed) {
+    if (speed == 0) return 0;
+    uint32_t now = k_uptime_get_32();
+    uint32_t delay = speed - (now % speed);
+    return (delay == 0) ? speed : delay;
+}
+
 static void loop_ticker_work_cb(struct k_work *work) {
     uint16_t speed = engine_get_active_loop_speed(is_screen_idle);
     if (speed > 0) {
         loop_ticker_state++;
         engine_trigger_refresh();
-        k_work_reschedule(&loop_ticker_work, K_MSEC(speed));
+        k_work_reschedule(&loop_ticker_work, K_MSEC(engine_calc_aligned_loop_delay(speed)));
     }
 }
 
@@ -261,7 +268,7 @@ static void idle_work_cb(struct k_work *work) {
         engine_trigger_refresh();
         uint16_t idle_speed = engine_get_active_loop_speed(true);
         if (idle_speed > 0) {
-            k_work_reschedule(&loop_ticker_work, K_MSEC(idle_speed));
+            k_work_reschedule(&loop_ticker_work, K_MSEC(engine_calc_aligned_loop_delay(idle_speed)));
         } else {
             k_work_cancel_delayable(&loop_ticker_work);
         }
@@ -324,7 +331,7 @@ void engine_notify_activity(void) {
         }
         uint16_t active_speed = engine_get_active_loop_speed(false);
         if (active_speed > 0) {
-            k_work_reschedule(&loop_ticker_work, K_MSEC(active_speed));
+            k_work_reschedule(&loop_ticker_work, K_MSEC(engine_calc_aligned_loop_delay(active_speed)));
         } else {
             k_work_cancel_delayable(&loop_ticker_work);
         }
@@ -396,6 +403,6 @@ void engine_init(lv_obj_t *canvas_obj) {
     k_work_init_delayable(&loop_ticker_work, loop_ticker_work_cb);
     uint16_t init_loop_speed = engine_get_active_loop_speed(false);
     if (init_loop_speed > 0) {
-        k_work_schedule(&loop_ticker_work, K_MSEC(init_loop_speed));
+        k_work_schedule(&loop_ticker_work, K_MSEC(engine_calc_aligned_loop_delay(init_loop_speed)));
     }
 }
