@@ -184,6 +184,10 @@ static void engine_render(const struct custom_status_state *state) {
     transform_flush_to_lvgl_canvas(engine_canvas_obj, engine_get_rotation_for_half());
 }
 
+static struct k_work_delayable loop_ticker_work;
+static uint16_t engine_get_active_loop_speed(bool is_idle);
+static inline uint32_t engine_calc_aligned_loop_delay(uint16_t speed);
+
 void engine_update_state(struct custom_status_state state) {
     state.is_idle = is_screen_idle;
 
@@ -193,6 +197,11 @@ void engine_update_state(struct custom_status_state state) {
 
     last_rendered_state = state;
     state_has_rendered = true;
+
+    uint16_t loop_speed = engine_get_active_loop_speed(state.is_idle);
+    if (loop_speed > 0) {
+        k_work_reschedule(&loop_ticker_work, K_MSEC(engine_calc_aligned_loop_delay(loop_speed)));
+    }
 
     engine_render(&state);
 }
@@ -213,12 +222,20 @@ static uint16_t engine_get_active_loop_speed(bool is_idle) {
                 min_speed = speed;
             }
         }
+        if (blocks[i].enabled && blocks[i].type == WIDGET_TYPE_OUTPUT_STATUS && blocks[i].symbol_count >= 13) {
+            if (last_rendered_state.selected_endpoint.transport == ZMK_TRANSPORT_BLE &&
+                !last_rendered_state.active_profile_connected) {
+                uint16_t speed = 500;
+                if (min_speed == 0 || speed < min_speed) {
+                    min_speed = speed;
+                }
+            }
+        }
     }
     return min_speed;
 }
 
 static uint32_t loop_ticker_state = 0;
-static struct k_work_delayable loop_ticker_work;
 
 static inline uint32_t engine_calc_aligned_loop_delay(uint16_t speed) {
     if (speed == 0) return 0;
