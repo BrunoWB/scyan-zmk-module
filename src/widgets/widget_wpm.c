@@ -115,39 +115,98 @@ void widget_render_wpm_chart(const struct display_layout_block *b, const struct 
         canvas_fill_rect(inner_x, inner_y + inner_h - 1, inner_w, 1, 1);
     }
 
-    // Oscilloscope / heartbeat line:
-    // Rightmost column (inner_x + inner_w - 1) is NOW (current state->wpm).
-    // Older samples scroll left from rightmost column scaled across time_window.
-    // Top = targetSpeed, Bottom = 0 WPM.
-    int prev_py = -1;
-    for (int c = 0; c < inner_w; c++) {
-        int px = inner_x + c;
-        uint8_t val;
-        if (c == inner_w - 1) {
-            val = state->wpm;
+    if (b->mode == 1) {
+        // Bar chart mode:
+        // Calculate bar width based on time window:
+        // Shorter time window produces wider bars; longer time window produces narrower bars.
+        int gap = 1;
+        int bar_w = 1;
+        if (time_window <= 12) {
+            bar_w = (inner_w + 4) / 8 - gap;
+            if (bar_w > 5) bar_w = 5;
+        } else if (time_window <= 25) {
+            bar_w = (inner_w + 5) / 10 - gap;
+            if (bar_w > 4) bar_w = 4;
+        } else if (time_window <= 45) {
+            bar_w = (inner_w + 6) / 12 - gap;
+            if (bar_w > 3) bar_w = 3;
+        } else if (time_window <= 75) {
+            bar_w = (inner_w + 8) / 16 - gap;
+            if (bar_w > 2) bar_w = 2;
         } else {
-            int age_sec = (inner_w > 1) ? ((inner_w - 1 - c) * time_window) / (inner_w - 1) : 0;
-            if (age_sec == 0) {
+            bar_w = 1;
+        }
+        if (bar_w < 1) bar_w = 1;
+
+        int step = bar_w + gap;
+        int bar_idx = 0;
+        while (1) {
+            int bar_end = inner_x + inner_w - 1 - bar_idx * step;
+            if (bar_end < inner_x) break;
+            int bar_start = bar_end - bar_w + 1;
+            if (bar_start < inner_x) bar_start = inner_x;
+
+            uint8_t val;
+            if (bar_idx == 0) {
                 val = state->wpm;
-            } else if (age_sec <= wpm_history_count && (WPM_HISTORY_MAX - age_sec) >= 0) {
-                val = wpm_history[WPM_HISTORY_MAX - age_sec];
             } else {
-                val = 0;
+                int bar_center = (bar_start + bar_end) / 2;
+                int age_sec = (inner_w > 1) ? ((inner_x + inner_w - 1 - bar_center) * time_window) / (inner_w - 1) : 0;
+                if (age_sec == 0) {
+                    val = state->wpm;
+                } else if (age_sec <= wpm_history_count && (WPM_HISTORY_MAX - age_sec) >= 0) {
+                    val = wpm_history[WPM_HISTORY_MAX - age_sec];
+                } else {
+                    val = 0;
+                }
             }
+
+            int clamped_val = val > target ? target : val;
+            int bar_h = clamped_val > 0 ? (clamped_val * (inner_h - 1)) / target : 0;
+            if (clamped_val > 0 && bar_h == 0) bar_h = 1;
+
+            int py = (inner_y + inner_h - 1) - bar_h;
+            int draw_w = bar_end - bar_start + 1;
+            int draw_h = bar_h + 1;
+            canvas_fill_rect(bar_start, py, draw_w, draw_h, 1);
+
+            bar_idx++;
         }
-
-        int clamped_val = val > target ? target : val;
-        int py = (inner_y + inner_h - 1) - ((clamped_val * (inner_h - 1)) / target);
-
-        if (c > 0 && prev_py >= 0) {
-            int min_y = prev_py < py ? prev_py : py;
-            int max_y = prev_py > py ? prev_py : py;
-            for (int y = min_y; y <= max_y; y++) {
-                canvas_set_pixel(px, y, 1);
+    } else {
+        // Oscilloscope / heartbeat line:
+        // Rightmost column (inner_x + inner_w - 1) is NOW (current state->wpm).
+        // Older samples scroll left from rightmost column scaled across time_window.
+        // Top = targetSpeed, Bottom = 0 WPM.
+        int prev_py = -1;
+        for (int c = 0; c < inner_w; c++) {
+            int px = inner_x + c;
+            uint8_t val;
+            if (c == inner_w - 1) {
+                val = state->wpm;
+            } else {
+                int age_sec = (inner_w > 1) ? ((inner_w - 1 - c) * time_window) / (inner_w - 1) : 0;
+                if (age_sec == 0) {
+                    val = state->wpm;
+                } else if (age_sec <= wpm_history_count && (WPM_HISTORY_MAX - age_sec) >= 0) {
+                    val = wpm_history[WPM_HISTORY_MAX - age_sec];
+                } else {
+                    val = 0;
+                }
             }
-        } else {
-            canvas_set_pixel(px, py, 1);
+
+            int clamped_val = val > target ? target : val;
+            int py = (inner_y + inner_h - 1) - ((clamped_val * (inner_h - 1)) / target);
+
+            if (c > 0 && prev_py >= 0) {
+                int min_y = prev_py < py ? prev_py : py;
+                int max_y = prev_py > py ? prev_py : py;
+                for (int y = min_y; y <= max_y; y++) {
+                    canvas_set_pixel(px, y, 1);
+                }
+            } else {
+                canvas_set_pixel(px, py, 1);
+            }
+            prev_py = py;
         }
-        prev_py = py;
     }
 }
