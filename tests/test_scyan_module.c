@@ -429,6 +429,27 @@ void test_wpm_chart_widget(void) {
     // Rightmost inner column is x = 30 and peak is at top (y = 1)
     assert(canvas_get_pixel(30, 1) == 1);
 
+    // Test Bar Chart mode (mode = 1)
+    chart_block.width = 32;
+    chart_block.height = 20;
+    chart_block.mode = 1;
+    chart_block.param1 = 4;
+    chart_block.param2 = 100;
+    chart_block.param3 = 30;
+    state.wpm = 100;
+    canvas_clear();
+    widget_render_wpm_chart(&chart_block, &state);
+    // Outer border
+    assert(canvas_get_pixel(0, 0) == 1);
+    assert(canvas_get_pixel(31, 0) == 1);
+    // Rightmost bar spans x = 29..30, full height (y = 1..18)
+    assert(canvas_get_pixel(30, 1) == 1);
+    assert(canvas_get_pixel(29, 1) == 1);
+    assert(canvas_get_pixel(30, 18) == 1);
+    assert(canvas_get_pixel(29, 18) == 1);
+    // 1px gap at x = 28 should not be filled at top
+    assert(canvas_get_pixel(28, 1) == 0);
+
     printf("  -> WPM chart widget passed successfully.\n");
 }
 
